@@ -28,7 +28,7 @@ end)
 print("[VD Hub] Loading FluentUI...")
 local _src = nil
 pcall(function()
-    _src = game:HttpGet("https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/FluentUI.lua")
+    _src = game:HttpGet("https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/uiDeVAl.lua")
 end)
 if not _src or _src == "" then warn("[VD Hub] HttpGet failed"); return end
 local _fn, _err = loadstring(_src)
