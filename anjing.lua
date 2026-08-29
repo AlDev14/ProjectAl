@@ -404,7 +404,32 @@ Onyx.Callbacks.OnSuccess = function()
         if esp then esp:Destroy() end
     end
 
+    -- ESP Map cache (update setiap 5 detik, tidak tiap frame)
+    local _espMapCache = { Generators={}, Pallets={}, Hooks={}, Gates={} }
+    local _espMapCacheTime = 0
+    local function refreshMapCache()
+        local now = workspace.DistributedGameTime
+        if now - _espMapCacheTime < 5 then return end
+        _espMapCacheTime = now
+        _espMapCache = { Generators={}, Pallets={}, Hooks={}, Gates={} }
+        local map = workspace:FindFirstChild("Map")
+        if not map then return end
+        for _, obj in ipairs(map:GetDescendants()) do
+            local n = obj.Name
+            if n=="Generator" then table.insert(_espMapCache.Generators, obj)
+            elseif n=="Hook" then table.insert(_espMapCache.Hooks, obj)
+            elseif n=="Gate" then table.insert(_espMapCache.Gates, obj)
+            elseif n=="Pallet" or n=="Palletwrong" then table.insert(_espMapCache.Pallets, obj)
+            end
+        end
+    end
+
+    local _espLastUpdate = 0
     local function updateESP()
+        local now = workspace.DistributedGameTime
+        if now - _espLastUpdate < 2.5 then return end
+        _espLastUpdate = now
+        refreshMapCache()
         clearESP()
         if not VD.ESP_Enabled then return end
         local root = getRoot()
@@ -469,8 +494,8 @@ Onyx.Callbacks.OnSuccess = function()
         end
 
         if VD.ESP_Pallet then
-            for _, pallet in ipairs(Workspace:GetDescendants()) do
-                if (pallet.Name == "Pallet" or pallet.Name == "Palletwrong") and pallet:IsA("Model") then
+            for _, pallet in ipairs(_espMapCache.Pallets or {}) do
+                if pallet and pallet.Parent and pallet:IsA("Model") then
                     local part = pallet:FindFirstChild("PalletPoint") or pallet:FindFirstChildWhichIsA("BasePart")
                     if part then
                         local dist = (part.Position - root.Position).Magnitude
@@ -520,8 +545,8 @@ Onyx.Callbacks.OnSuccess = function()
         end
 
         if VD.ESP_Gate then
-            for _, gate in ipairs(Workspace:GetDescendants()) do
-                if gate.Name == "Gate" and gate:IsA("Model") then
+            for _, gate in ipairs(_espMapCache.Gates or {}) do
+                if gate and gate.Parent and gate:IsA("Model") then
                     local part = gate:FindFirstChild("GatePart") or gate:FindFirstChildWhichIsA("BasePart")
                     if part then
                         local dist = (part.Position - root.Position).Magnitude
@@ -859,9 +884,14 @@ Onyx.Callbacks.OnSuccess = function()
 
     local function executeVeilSilentAim()
         local target = getVeilTarget()
-        if target and VeilRemote then
-            pcall(function() VeilRemote:FireServer(target) end)
-        end
+        if not VeilRemote then return end
+        pcall(function()
+            local ok1 = pcall(function() VeilRemote:FireServer(target) end)
+            if ok1 then return end
+            local ok2 = pcall(function() VeilRemote:FireServer() end)
+            if ok2 then return end
+            if target then pcall(function() VeilRemote:FireServer(target.Position) end) end
+        end)
     end
 
     local function getSpearTarget()
@@ -1290,8 +1320,32 @@ Onyx.Callbacks.OnSuccess = function()
             if not line or not goal then return end
             local mode = VD.AutoSkillcheckMode
             if mode == "Random" then
-                mode = (math.random(1,2) == 1) and "Instant" or "Legit"
+                mode = (math.random(1,2)==1) and "Instant" or "Legit"
             end
+            if mode == "Instant" then
+                line.Rotation = goal.Rotation + 109
+                StateSkill.busy = true
+                task.spawn(function()
+                    TriggerSkillCheckW424()
+                    task.wait(0.2)
+                    StateSkill.busy = false
+                end)
+            else
+                local lr = line.Rotation % 360
+                local gr = goal.Rotation % 360
+                local s1 = (gr+102)%360; local e1 = (gr+116)%360
+                local inside = (s1>e1 and (lr>=s1 or lr<=e1)) or (lr>=s1 and lr<=e1)
+                if inside then
+                    StateSkill.busy = true
+                    task.spawn(function()
+                        TriggerSkillCheckW424()
+                        task.wait(0.05)
+                        StateSkill.busy = false
+                    end)
+                end
+            end
+        end)
+    end
             if mode == "Instant" then
                 line.Rotation = goal.Rotation + 109
                 StateSkill.busy = true
@@ -1361,12 +1415,30 @@ Onyx.Callbacks.OnSuccess = function()
         end
     end)
 
-    local ParryRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Items") and ReplicatedStorage.Remotes.Items:FindFirstChild("Parrying Dagger") and ReplicatedStorage.Remotes.Items["Parrying Dagger"]:FindFirstChild("parry")
+    local ParryRemote = nil
+    local function getParryRemote()
+        if ParryRemote and ParryRemote.Parent then return ParryRemote end
+        pcall(function()
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            local items = r and r:FindFirstChild("Items")
+            local dagger = items and items:FindFirstChild("Parrying Dagger")
+            ParryRemote = dagger and dagger:FindFirstChild("parry")
+            if not ParryRemote and r then
+                for _,v in ipairs(r:GetDescendants()) do
+                    if v:IsA("RemoteEvent") and v.Name:lower()=="parry" then
+                        ParryRemote=v; break
+                    end
+                end
+            end
+        end)
+        return ParryRemote
+    end
 
     local function ExecuteParry()
-        if ParryState.ParryCooldown or not ParryRemote then return end
+        local remote = getParryRemote()
+        if ParryState.ParryCooldown or not remote then return end
         pcall(function()
-            for i = 1, 10 do ParryRemote:FireServer() end
+            for i = 1, 10 do remote:FireServer() end
             VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
             task.wait(0.01)
             VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
