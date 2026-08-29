@@ -1,6 +1,6 @@
 -- ============================================================
 -- VD HUB - Violent District
--- Version: 1.0
+-- Version: 1.1 (Namespaced)
 -- ============================================================
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait(1)
@@ -31,10 +31,8 @@ pcall(function()
     _src = game:HttpGet("https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/FluentUI.lua")
 end)
 if not _src or _src == "" then warn("[VD Hub] HttpGet failed"); return end
-
 local _fn, _err = loadstring(_src)
 if not _fn then warn("[VD Hub] loadstring error: "..tostring(_err)); return end
-
 local ok, Fluent = pcall(_fn)
 if not ok or not Fluent then warn("[VD Hub] FluentUI error: "..tostring(Fluent)); return end
 print("[VD Hub] FluentUI OK")
@@ -42,8 +40,9 @@ print("[VD Hub] FluentUI OK")
 
 
 -- ============================================================
--- SKILL CHECK
+-- SC (skillcheck.lua)
 -- ============================================================
+local SC = (function()
 -- ============================================================
 -- AUTO SKILL CHECK
 -- Violent District - Delta Executor
@@ -149,11 +148,21 @@ local function stopSkillCheck()
 end
 
 -- Return module
+    -- Expose API
+    return {
+        SkillCheck = SkillCheck,
+        startSkillCheck = startSkillCheck,
+        stopSkillCheck = stopSkillCheck,
+        conn = conn,
+        busy = busy,
+    }
+end)()
 
 
 -- ============================================================
--- AUTO PARRY
+-- Parry (autoparry.lua)
 -- ============================================================
+local Parry = (function()
 -- ============================================================
 -- AUTO PARRY
 -- Violent District - Delta Executor
@@ -511,11 +520,24 @@ end
 Players.PlayerAdded:Connect(SetupPlayer)
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        State = State,
+        Attached = Attached,
+        ExecuteParry = ExecuteParry,
+        AttachParrySensor = AttachParrySensor,
+        SetupPlayer = SetupPlayer,
+        ListenToParryResult = ListenToParryResult,
+        ParryCircle = ParryCircle,
+    }
+end)()
 
 
 -- ============================================================
--- GEN BYPASS
+-- GenBP (genbypass.lua)
 -- ============================================================
+local GenBP = (function()
 -- ============================================================
 -- GEN BYPASS (Boost Repair)
 -- Violent District - Delta Executor
@@ -761,11 +783,25 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- Return module
+    -- Expose API
+    return {
+        GenBypass = GenBypass,
+        GB_GetAllGenerators = GB_GetAllGenerators,
+        GB_GetPoints = GB_GetPoints,
+        GB_WaitRepairing = GB_WaitRepairing,
+        GB_DoRepair = GB_DoRepair,
+        GB_GetNearestPoint = GB_GetNearestPoint,
+        GB_CreateButton = GB_CreateButton,
+        GB_UpdateButton = GB_UpdateButton,
+        setGenBypass = setGenBypass,
+    }
+end)()
 
 
 -- ============================================================
--- AUTO DODGE
+-- Dodge (autododge.lua)
 -- ============================================================
+local Dodge = (function()
 -- ============================================================
 -- AUTO DODGE / CROUCH (Abyssal S1)
 -- Violent District - Delta Executor
@@ -920,11 +956,19 @@ end
 Players.PlayerAdded:Connect(SetupPlayer)
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        Attached = Attached,
+        AttachDodgeSensor = AttachDodgeSensor,
+    }
+end)()
 
 
 -- ============================================================
--- FAST VAULT
+-- FVault (fastvault.lua)
 -- ============================================================
+local FVault = (function()
 -- ============================================================
 -- FAST VAULT (Anti Slow Vault)
 -- Violent District - Delta Executor
@@ -1077,11 +1121,24 @@ if LocalPlayer.Character then
 end
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        VaultTracks = VaultTracks,
+        hookVault = hookVault,
+        EnableUnlimitedVault = EnableUnlimitedVault,
+        DisableUnlimitedVault = DisableUnlimitedVault,
+        Enable = Enable,
+        Disable = Disable,
+        normalizeId = normalizeId,
+    }
+end)()
 
 
 -- ============================================================
--- SELF HEAL + ANTI AURA + SILENT
+-- SAS (selfheal_noaura_silent.lua)
 -- ============================================================
+local SAS = (function()
 -- ============================================================
 -- SELF HEAL + SILENT ACTIONS + ANTI AURA
 -- Violent District - Delta Executor
@@ -1216,11 +1273,21 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        _auraCache = _auraCache,
+        _hooked = _hooked,
+        _oldCall = _oldCall,
+        setupHooks = setupHooks,
+    }
+end)()
 
 
 -- ============================================================
--- MOONWALK V3
+-- MW (moonwalk.lua)
 -- ============================================================
+local MW = (function()
 -- ============================================================
 -- MOONWALK V3
 -- Violent District - Delta Executor
@@ -1543,11 +1610,24 @@ local function Disable()
     destroyMoonwalkGui()
 end
 
+    -- Expose API
+    return {
+        CONFIG = CONFIG,
+        MoonwalkEnabled = MoonwalkEnabled,
+        startMoonwalkInternal = startMoonwalkInternal,
+        stopMoonwalkInternal = stopMoonwalkInternal,
+        createMoonwalkGui = createMoonwalkGui,
+        destroyMoonwalkGui = destroyMoonwalkGui,
+        Enable = Enable,
+        Disable = Disable,
+    }
+end)()
 
 
 -- ============================================================
--- KILLER PREDICTION
+-- KP (killerprediction.lua)
 -- ============================================================
+local KP = (function()
 -- ============================================================
 -- KILLER PREDICTION (Spectator Only)
 -- Violent District - Delta Executor
@@ -1697,11 +1777,24 @@ Players:GetPropertyChangedSignal("LocalPlayer"):Connect(function()
     end
 end)
 
+    -- Expose API
+    return {
+        Config = Config,
+        PredGui = PredGui,
+        PredLabel = PredLabel,
+        createPredGui = createPredGui,
+        destroyPredGui = destroyPredGui,
+        updateDisplay = updateDisplay,
+        Enable = Enable,
+        Disable = Disable,
+    }
+end)()
 
 
 -- ============================================================
--- SILENT AIM TOF
+-- SAToF (silenttof.lua)
 -- ============================================================
+local SAToF = (function()
 -- ============================================================
 -- SILENT AIM TOF (Twist of Fate)
 -- Violent District - Delta Executor
@@ -2017,11 +2110,24 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        isCharging = isCharging,
+        lockedTarget = lockedTarget,
+        pistolLaser = pistolLaser,
+        FOVCircle = FOVCircle,
+        getPistolTarget = getPistolTarget,
+        executeSilentAimFire = executeSilentAimFire,
+        createLaser = createLaser,
+    }
+end)()
 
 
 -- ============================================================
--- SPEAR AIM + SNAPLINE
+-- Spear (spearaim.lua)
 -- ============================================================
+local Spear = (function()
 -- ============================================================
 -- SILENT AIM SPEAR (Killer)
 -- Violent District - Delta Executor
@@ -2193,11 +2299,22 @@ end
 start()
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        SnapLine = SnapLine,
+        SpearAimbotCalc = SpearAimbotCalc,
+        getClosestSpearTarget = getClosestSpearTarget,
+        Start = Start,
+        Stop = Stop,
+    }
+end)()
 
 
 -- ============================================================
--- MASK SELECTION
+-- Mask (maskedselection.lua)
 -- ============================================================
+local Mask = (function()
 -- ============================================================
 -- MASK SELECTION (The Masked Killer)
 -- Violent District - Delta Executor
@@ -2488,11 +2605,24 @@ local function Hide()
     if MaskGui and MaskGui.Parent then MaskGui:Destroy(); MaskGui=nil end
 end
 
+    -- Expose API
+    return {
+        MASK_DATA = MASK_DATA,
+        MaskGui = MaskGui,
+        MaskKeyConn = MaskKeyConn,
+        FireMask = FireMask,
+        CheckIsMasked = CheckIsMasked,
+        BuildMaskGui = BuildMaskGui,
+        Show = Show,
+        Hide = Hide,
+    }
+end)()
 
 
 -- ============================================================
--- DOUBLE DAMAGE GEN
+-- DDmg (doubledmg.lua)
 -- ============================================================
+local DDmg = (function()
 -- ============================================================
 -- DOUBLE DAMAGE GENERATOR (Killer)
 -- Violent District - Delta Executor
@@ -2571,11 +2701,19 @@ end
 setupHook()
 
 -- Return module
+    -- Expose API
+    return {
+        Config = Config,
+        _hooked = _hooked,
+        setupHook = setupHook,
+    }
+end)()
 
 
 -- ============================================================
--- AUTO STALK
+-- Stalk (autostalk.lua)
 -- ============================================================
+local Stalk = (function()
 -- ============================================================
 -- AUTO STALK (Myers Killer)
 -- Violent District - Delta Executor
@@ -2668,11 +2806,21 @@ local function Stop()
     _stalkRemote = nil
 end
 
+    -- Expose API
+    return {
+        Config = Config,
+        getClosestSurvivor = getClosestSurvivor,
+        getStalkRemote = getStalkRemote,
+        Start = Start,
+        Stop = Stop,
+    }
+end)()
 
 
 -- ============================================================
--- HITBOX EXPANDER
+-- Hitbox (hitboxexpander.lua)
 -- ============================================================
+local Hitbox = (function()
 -- ============================================================
 -- HITBOX EXPANDER (Killer)
 -- Violent District - Delta Executor
@@ -2762,11 +2910,21 @@ Players.PlayerRemoving:Connect(function(p)
     end
 end)
 
+    -- Expose API
+    return {
+        Config = Config,
+        _origSizes = _origSizes,
+        restoreAll = restoreAll,
+        Start = Start,
+        Stop = Stop,
+    }
+end)()
 
 
 -- ============================================================
--- ESP
+-- ESP (esp.lua)
 -- ============================================================
+local ESP = (function()
 -- ============================================================
 -- ESP (Violent District)
 -- Simple highlight only, no text spam
@@ -3103,11 +3261,30 @@ local function Stop()
     _gateData = {}
 end
 
+    -- Expose API
+    return {
+        Config = Config,
+        COLORS = COLORS,
+        _mapCache = _mapCache,
+        _gateData = _gateData,
+        _highlights = _highlights,
+        _billboards = _billboards,
+        refreshMapCache = refreshMapCache,
+        updateESP = updateESP,
+        addHighlight = addHighlight,
+        addBillboard = addBillboard,
+        clearESP = clearESP,
+        getGateText = getGateText,
+        Start = Start,
+        Stop = Stop,
+    }
+end)()
 
 
 -- ============================================================
--- MORPHS
+-- Morphs (morphs.lua)
 -- ============================================================
+local Morphs = (function()
 -- ============================================================
 -- MORPHS (Visual)
 -- Violent District - Delta Executor
@@ -3212,11 +3389,17 @@ end
 -- ============================================================
 -- RETURN MODULE
 -- ============================================================
+    -- Expose API
+    return {
+        Korblox = Korblox,
+    }
+end)()
 
 
 -- ============================================================
--- VISUALS
+-- Visuals (visuals.lua)
 -- ============================================================
+local Visuals = (function()
 -- ============================================================
 -- VISUALS (Misc)
 -- Violent District - Delta Executor
@@ -3461,6 +3644,22 @@ end
 -- ============================================================
 -- RETURN MODULE
 -- ============================================================
+    -- Expose API
+    return {
+        Config = Config,
+        _orig = _orig,
+        applyNoShadow = applyNoShadow,
+        applyFullbright = applyFullbright,
+        applyReduceMap = applyReduceMap,
+        startCounter = startCounter,
+        stopCounter = stopCounter,
+        SetNoShadow = SetNoShadow,
+        SetFullbright = SetFullbright,
+        SetReduceMap = SetReduceMap,
+        StartCounter = StartCounter,
+        StopCounter = StopCounter,
+    }
+end)()
 
 
 -- ============================================================
@@ -3490,101 +3689,97 @@ end
 
 local function N(t,c,tp,d) Fluent:Notify({Title=t,Content=c,Type=tp or "Info",Duration=d or 2}) end
 
--- ===== TAB SURVIVOR =====
+-- ===== SURVIVOR =====
 local secSkill = tabSurv:AddSection("Skill Check")
 secSkill:AddToggle("SkillCheck",{Title="Auto Skill Check",Default=false,
-    Callback=function(v) SkillCheck.Enabled=v; if v then startSkillCheck() else if conn then conn:Disconnect() end end end})
+    Callback=function(v) SC.SkillCheck.Enabled=v; if v then SC.startSkillCheck() else if SC.conn then SC.conn:Disconnect() end end end})
 secSkill:AddDropdown("SCMode",{Title="Mode",Values={"Instant","Legit","Random"},Default=2,
-    Callback=function(v) SkillCheck.Mode=v end})
+    Callback=function(v) SC.SkillCheck.Mode=v end})
 
 local secParry = tabSurv:AddSection("Auto Parry")
-secParry:AddToggle("Parry",{Title="Auto Parry",Default=false,Callback=function(v) Config.Enabled=v end})
-secParry:AddSlider("ParryRange",{Title="Range",Min=5,Max=30,Default=15,Rounding=1,Callback=function(v) Config.Radius=v end})
-secParry:AddToggle("ParrySafety",{Title="Safety Mode",Default=true,Callback=function(v) Config.Safety=v end})
-secParry:AddToggle("ParryAggressive",{Title="Aggressive",Default=false,Callback=function(v) Config.Aggressive=v end})
+secParry:AddToggle("Parry",{Title="Auto Parry",Default=false,Callback=function(v) Parry.Config.Enabled=v end})
+secParry:AddSlider("ParryRange",{Title="Range",Min=5,Max=30,Default=15,Rounding=1,Callback=function(v) Parry.Config.Radius=v end})
+secParry:AddToggle("ParrySafety",{Title="Safety Mode",Default=true,Callback=function(v) Parry.Config.Safety=v end})
+secParry:AddToggle("ParryAggressive",{Title="Aggressive",Default=false,Callback=function(v) Parry.Config.Aggressive=v end})
+secParry:AddSlider("ParryFace",{Title="Face Threshold",Min=0,Max=1,Default=0.7,Rounding=0.1,Callback=function(v) Parry.Config.FaceThreshold=v end})
 
 local secSurvMisc = tabSurv:AddSection("Survivor Misc")
-secSurvMisc:AddToggle("AutoCrouch",{Title="Auto Dodge/Crouch",Default=false,Callback=function(v) Config.AutoCrouch=v end})
+secSurvMisc:AddToggle("AutoCrouch",{Title="Auto Dodge/Crouch",Default=false,Callback=function(v) Dodge.Config.Enabled=v end})
 secSurvMisc:AddToggle("FastVault",{Title="Fast Vault",Default=false,Callback=function(v)
-    if v then Enable() else Disable() end end})
-secSurvMisc:AddToggle("SelfHeal",{Title="Self Heal",Default=false,Callback=function(v) Config.SelfHeal=v end})
-secSurvMisc:AddToggle("SilentActions",{Title="Silent Actions",Default=false,Callback=function(v) Config.SilentActions=v end})
-secSurvMisc:AddToggle("AntiAura",{Title="Anti Aura",Default=false,Callback=function(v) Config.AntiAura=v end})
+    if v then FVault.Enable() else FVault.Disable() end end})
+secSurvMisc:AddToggle("SelfHeal",{Title="Self Heal",Default=false,Callback=function(v) SAS.Config.SelfHeal=v end})
+secSurvMisc:AddToggle("SilentActions",{Title="Silent Actions",Default=false,Callback=function(v) SAS.Config.SilentActions=v end})
+secSurvMisc:AddToggle("AntiAura",{Title="Anti Aura",Default=false,Callback=function(v) SAS.Config.AntiAura=v end})
 secSurvMisc:AddToggle("MoonwalkTog",{Title="Moonwalk V3",Default=false,Callback=function(v)
-    if v then Enable() else Disable() end end})
-secSurvMisc:AddToggle("GenBypass",{Title="Gen Bypass",Default=false,Callback=function(v)
-    GenBypass.Enabled=v; GB_UpdateButton() end})
-secSurvMisc:AddToggle("KillerPred",{Title="Killer Prediction",Default=false,Callback=function(v)
-    if v then Enable() else Disable() end end})
+    if v then MW.Enable() else MW.Disable() end end})
+secSurvMisc:AddToggle("GenBypassTog",{Title="Gen Bypass",Default=false,Callback=function(v)
+    GenBP.GenBypass.Enabled=v; GenBP.GB_UpdateButton() end})
+secSurvMisc:AddToggle("KillerPredTog",{Title="Killer Prediction",Default=false,Callback=function(v)
+    if v then KP.Enable() else KP.Disable() end end})
 
--- ===== TAB KILLER =====
+-- ===== KILLER =====
 local secKillerFeat = tabKiller:AddSection("Killer Features")
-secKillerFeat:AddToggle("DoubleDmg",{Title="Double Damage Gen",Default=false,Callback=function(v) Config.Enabled=v end})
-secKillerFeat:AddToggle("AutoStalk",{Title="Auto Stalk",Default=false,Callback=function(v)
-    if v then Start() else Stop() end end})
+secKillerFeat:AddToggle("DoubleDmg",{Title="Double Damage Gen",Default=false,Callback=function(v) DDmg.Config.Enabled=v end})
+secKillerFeat:AddToggle("AutoStalkTog",{Title="Auto Stalk",Default=false,Callback=function(v)
+    if v then Stalk.Start() else Stalk.Stop() end end})
 secKillerFeat:AddSlider("StalkRange",{Title="Stalk Range",Min=50,Max=300,Default=150,Rounding=0,
-    Callback=function(v) Config.StalkRange=v end})
+    Callback=function(v) Stalk.Config.StalkRange=v end})
 
 local secHitbox = tabKiller:AddSection("Hitbox Expander")
 secHitbox:AddToggle("HitboxTog",{Title="Hitbox Expander",Default=false,Callback=function(v)
-    if v then Start() else Stop() end end})
+    if v then Hitbox.Start() else Hitbox.Stop() end end})
 secHitbox:AddSlider("HitboxSize",{Title="Size",Min=2,Max=50,Default=15,Rounding=0,
-    Callback=function(v) Config.Size=v end})
+    Callback=function(v) Hitbox.Config.Size=v end})
 
-local secSpear = tabKiller:AddSection("Spear Aim + Snapline")
-secSpear:AddToggle("SpearTog",{Title="Spear Aim",Default=false,Callback=function(v) Config.Enabled=v end})
-secSpear:AddSlider("SpearGrav",{Title="Gravity",Min=10,Max=200,Default=50,Rounding=0,
-    Callback=function(v) Config.Gravity=v end})
-secSpear:AddSlider("SpearSpd",{Title="Speed",Min=20,Max=300,Default=100,Rounding=0,
-    Callback=function(v) Config.Speed=v end})
-secSpear:AddToggle("SnaplineTog",{Title="Show Snapline",Default=true,Callback=function(v) Config.ShowSnapline=v end})
+local secSpearUI = tabKiller:AddSection("Spear Aim")
+secSpearUI:AddToggle("SpearTog",{Title="Spear Aim",Default=false,Callback=function(v) Spear.Config.Enabled=v end})
+secSpearUI:AddSlider("SpearGrav",{Title="Gravity",Min=10,Max=200,Default=50,Rounding=0,Callback=function(v) Spear.Config.Gravity=v end})
+secSpearUI:AddSlider("SpearSpd",{Title="Speed",Min=20,Max=300,Default=100,Rounding=0,Callback=function(v) Spear.Config.Speed=v end})
+secSpearUI:AddToggle("SnaplineTog",{Title="Show Snapline",Default=true,Callback=function(v) Spear.Config.ShowSnapline=v end})
 
-local secMask = tabKiller:AddSection("Mask Selection")
-secMask:AddToggle("MaskTog",{Title="Mask Selection GUI",Default=false,Callback=function(v)
-    if v then Show() else Hide() end end})
-secMask:AddParagraph({Title="Keys",Content="1-6: mask | 7: deactivate | M: minimize"})
+local secMaskUI = tabKiller:AddSection("Mask Selection")
+secMaskUI:AddToggle("MaskTog",{Title="Mask Selection GUI",Default=false,Callback=function(v)
+    if v then Mask.Show() else Mask.Hide() end end})
+secMaskUI:AddParagraph({Title="Keys",Content="1-6: mask | 7: deactivate | M: minimize"})
 
--- ===== TAB AIM =====
+-- ===== AIM =====
 local secToF = tabAim:AddSection("Silent Aim ToF")
-secToF:AddToggle("SAToF",{Title="Silent Aim ToF",Default=false,Callback=function(v) Config.Enabled=v end})
-secToF:AddToggle("SABlock",{Title="Block when Knocked",Default=false,Callback=function(v) Config.BlockKnocked=v end})
-secToF:AddToggle("SALock",{Title="Lock Aim",Default=false,Callback=function(v) Config.LockAim=v end})
-secToF:AddToggle("SAFOVMode",{Title="FOV Mode",Default=false,Callback=function(v) Config.FOVMode=v end})
-secToF:AddToggle("SAShowFOV",{Title="Show FOV Circle",Default=false,Callback=function(v) Config.ShowFOV=v end})
-secToF:AddSlider("SAFOV",{Title="FOV Radius",Min=30,Max=500,Default=150,Rounding=5,Callback=function(v) Config.FOV=v end})
-secToF:AddDropdown("SATarget",{Title="Target",Values={"Killer","Survivor"},Default=1,Callback=function(v) Config.Target=v end})
-secToF:AddDropdown("SAPart",{Title="Target Part",Values={"Torso","Head","Root"},Default=1,Callback=function(v) Config.TargetPart=v end})
-secToF:AddToggle("SAHideLaser",{Title="Hide Laser",Default=false,Callback=function(v) Config.HideLaser=v end})
+secToF:AddToggle("SAToF",{Title="Silent Aim ToF",Default=false,Callback=function(v) SAToF.Config.Enabled=v end})
+secToF:AddToggle("SABlock",{Title="Block when Knocked",Default=false,Callback=function(v) SAToF.Config.BlockKnocked=v end})
+secToF:AddToggle("SALock",{Title="Lock Aim",Default=false,Callback=function(v) SAToF.Config.LockAim=v end})
+secToF:AddToggle("SAFOVMode",{Title="FOV Mode",Default=false,Callback=function(v) SAToF.Config.FOVMode=v end})
+secToF:AddToggle("SAShowFOV",{Title="Show FOV Circle",Default=false,Callback=function(v) SAToF.Config.ShowFOV=v end})
+secToF:AddSlider("SAFOV",{Title="FOV Radius",Min=30,Max=500,Default=150,Rounding=5,Callback=function(v) SAToF.Config.FOV=v end})
+secToF:AddDropdown("SATarget",{Title="Target",Values={"Killer","Survivor"},Default=1,Callback=function(v) SAToF.Config.Target=v end})
+secToF:AddDropdown("SAPart",{Title="Target Part",Values={"Torso","Head","Root"},Default=1,Callback=function(v) SAToF.Config.TargetPart=v end})
+secToF:AddToggle("SAHideLaser",{Title="Hide Laser",Default=false,Callback=function(v) SAToF.Config.HideLaser=v end})
 
--- ===== TAB ESP =====
-local secESP = tabESP:AddSection("ESP Settings")
-secESP:AddToggle("ESPMain",{Title="Enable ESP",Default=false,Callback=function(v)
-    Config.Enabled=v; if v then Start() else Stop() end end})
-secESP:AddToggle("ESPSurv",{Title="Survivor",Default=true,Callback=function(v) Config.Survivor=v end})
-secESP:AddToggle("ESPKill",{Title="Killer",Default=true,Callback=function(v) Config.Killer=v end})
-secESP:AddToggle("ESPGen",{Title="Generator",Default=true,Callback=function(v) Config.Generator=v end})
-secESP:AddToggle("ESPGate",{Title="Gate + Timer",Default=true,Callback=function(v) Config.Gate=v end})
-secESP:AddToggle("ESPPallet",{Title="Pallet",Default=true,Callback=function(v) Config.Pallet=v end})
-secESP:AddToggle("ESPWindow",{Title="Window",Default=true,Callback=function(v) Config.Window=v end})
-secESP:AddToggle("ESPSCP",{Title="SCP",Default=false,Callback=function(v) Config.SCP=v end})
-secESP:AddSlider("ESPDist",{Title="Max Distance",Min=100,Max=10000,Default=5000,Rounding=0,
-    Callback=function(v) Config.Distance=v end})
-secESP:AddButton({Title="Refresh",Callback=function() _lastUpdate=0 end})
+-- ===== ESP =====
+local secESPUI = tabESP:AddSection("ESP Settings")
+secESPUI:AddToggle("ESPMain",{Title="Enable ESP",Default=false,Callback=function(v)
+    ESP.Config.Enabled=v; if v then ESP.Start() else ESP.Stop() end end})
+secESPUI:AddToggle("ESPSurv",{Title="Survivor",Default=true,Callback=function(v) ESP.Config.Survivor=v end})
+secESPUI:AddToggle("ESPKill",{Title="Killer",Default=true,Callback=function(v) ESP.Config.Killer=v end})
+secESPUI:AddToggle("ESPGen",{Title="Generator",Default=true,Callback=function(v) ESP.Config.Generator=v end})
+secESPUI:AddToggle("ESPGate",{Title="Gate + Timer",Default=true,Callback=function(v) ESP.Config.Gate=v end})
+secESPUI:AddToggle("ESPPallet",{Title="Pallet",Default=true,Callback=function(v) ESP.Config.Pallet=v end})
+secESPUI:AddToggle("ESPWindow",{Title="Window",Default=true,Callback=function(v) ESP.Config.Window=v end})
+secESPUI:AddToggle("ESPSCP",{Title="SCP",Default=false,Callback=function(v) ESP.Config.SCP=v end})
+secESPUI:AddSlider("ESPDist",{Title="Max Distance",Min=100,Max=10000,Default=5000,Rounding=0,
+    Callback=function(v) ESP.Config.Distance=v end})
+secESPUI:AddButton({Title="Refresh ESP",Callback=function() ESP._lastUpdate=0 end})
 
--- ===== TAB VISUAL =====
-local secVis = tabVisual:AddSection("Visual Settings")
-secVis:AddToggle("NoShadow",{Title="No Shadow",Default=false,Callback=function(v)
-    Config.NoShadow=v; SetNoShadow(v) end})
-secVis:AddToggle("Fullbright",{Title="Fullbright",Default=false,Callback=function(v)
-    Config.Fullbright=v; SetFullbright(v) end})
-secVis:AddToggle("ReduceMap",{Title="Reduce Map (Potato)",Default=false,Callback=function(v)
-    Config.ReduceMap=v; SetReduceMap(v) end})
-secVis:AddToggle("FPSCounter",{Title="FPS & Ping Counter",Default=false,Callback=function(v)
-    Config.ShowCounter=v; if v then StartCounter() else StopCounter() end end})
+-- ===== VISUAL =====
+local secVisUI = tabVisual:AddSection("Visual Settings")
+secVisUI:AddToggle("NoShadow",{Title="No Shadow",Default=false,Callback=function(v) Visuals.SetNoShadow(v) end})
+secVisUI:AddToggle("Fullbright",{Title="Fullbright",Default=false,Callback=function(v) Visuals.SetFullbright(v) end})
+secVisUI:AddToggle("ReduceMap",{Title="Reduce Map (Potato)",Default=false,Callback=function(v) Visuals.SetReduceMap(v) end})
+secVisUI:AddToggle("FPSCounter",{Title="FPS & Ping Counter",Default=false,Callback=function(v)
+    if v then Visuals.StartCounter() else Visuals.StopCounter() end end})
 
-local secMorphs = tabVisual:AddSection("Morphs")
-secMorphs:AddToggle("Korblox",{Title="Korblox",Default=false,Callback=function(v)
-    if v then Korblox.Enable() else Korblox.Disable() end end})
+local secMorphUI = tabVisual:AddSection("Morphs")
+secMorphUI:AddToggle("KorbloxTog",{Title="Korblox",Default=false,Callback=function(v)
+    if v then Morphs.Korblox.Enable() else Morphs.Korblox.Disable() end end})
 
 -- ===== UI SETTINGS =====
 pcall(function()
