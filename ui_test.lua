@@ -1,11 +1,10 @@
--- Test FluentUI Elements
+-- Test FluentUI v2
 local ok, Fluent = pcall(function()
     return loadstring(game:HttpGet(
         "https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/FluentUI.lua"
     ))()
 end)
 if not ok or not Fluent then warn("[Test] Load failed"); return end
-print("[Test] Fluent type="..type(Fluent))
 
 local Window = Fluent:CreateWindow({
     Title    = "UI Test",
@@ -17,29 +16,43 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.RightShift,
 })
 if not Window then warn("[Test] Window nil"); return end
-print("[Test] Window type="..type(Window))
-print("[Test] AddTab="..type(Window.AddTab))
 
 local tab1 = Window:AddTab({ Title="Test", Icon="solar/user-bold" })
-print("[Test] tab1 type="..type(tab1))
-print("[Test] tab1.AddSection="..tostring(tab1 and type(tab1.AddSection)))
+local sec1  = tab1:AddSection("Section 1")
+sec1:AddToggle("T1",{Title="Toggle",Default=false,Callback=function(v) print("T="..tostring(v)) end})
+sec1:AddSlider("S1",{Title="Slider",Min=0,Max=10,Default=5,Rounding=0,Callback=function(v) end})
+sec1:AddButton({Title="Button",Callback=function() print("click") end})
 
-local sec1 = tab1:AddSection("My Section")
-print("[Test] sec1 type="..type(sec1))
-print("[Test] sec1.AddToggle="..tostring(sec1 and type(sec1.AddToggle)))
+task.wait(0.5)
 
-local tog = sec1:AddToggle("T1",{Title="Toggle Test",Default=false,Callback=function(v) print("T="..tostring(v)) end})
-print("[Test] toggle type="..type(tog))
+-- Debug container
+pcall(function()
+    -- Coba select tab
+    if Window.SelectTab then Window:SelectTab(1) end
 
-local sl = sec1:AddSlider("S1",{Title="Slider",Min=0,Max=10,Default=5,Rounding=0,Callback=function(v) end})
-print("[Test] slider type="..type(sl))
+    -- Debug Window internals
+    local w = Window
+    print("[D] Window keys:")
+    for k,v in pairs(w) do
+        if type(v) ~= "function" then
+            print("  "..tostring(k).."="..tostring(v))
+        end
+    end
+end)
 
--- Force show
+-- Force show semua frame
 pcall(function()
     if Fluent.GUI then
-        Fluent.GUI.Enabled = true
-        Fluent.GUI.Parent = (gethui and gethui()) or game:GetService("CoreGui")
-        print("[Test] GUI parent="..tostring(Fluent.GUI.Parent))
+        local function showAll(inst, depth)
+            if depth > 10 then return end
+            if inst:IsA("Frame") or inst:IsA("ScrollingFrame") or inst:IsA("CanvasGroup") then
+                if inst.Size.X.Offset == 0 and inst.Size.Y.Offset == 0 and inst.Size.X.Scale == 0 and inst.Size.Y.Scale == 0 then
+                    print("[D] ZERO SIZE: "..inst:GetFullName())
+                end
+            end
+            for _,c in ipairs(inst:GetChildren()) do showAll(c, depth+1) end
+        end
+        showAll(Fluent.GUI, 0)
     end
 end)
 
