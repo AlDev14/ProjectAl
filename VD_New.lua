@@ -1517,7 +1517,7 @@ end)
 
 local _src = nil
 local _ok1 = pcall(function()
-    _src = game:HttpGet("https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/FluentProDeval.lua")
+    _src = game:HttpGet("https://raw.githubusercontent.com/AlDev14/modded-ui/refs/heads/main/FluentUI.lua")
 end)
 if not _ok1 or not _src or _src=="" then warn("[VD Hub] HttpGet failed"); return end
 
