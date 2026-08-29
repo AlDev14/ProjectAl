@@ -3668,17 +3668,17 @@ end)()
 -- UI (FluentUI)
 -- ============================================================
 local Window = Fluent:CreateWindow({
-    Title         = "VD Hub",
-    SubTitle      = "Violent District",
-    TabWidth      = 140,
-    Size          = UDim2.fromOffset(580, 420),
-    Theme         = "Darker",
-    Acrylic       = false,
-    Search        = true,
-    MinimizeKey   = Enum.KeyCode.RightShift,
-    ToggleButton  = true,
+    Title       = "VD Hub",
+    SubTitle    = "Violent District",
+    TabWidth    = 140,
+    Size        = UDim2.fromOffset(580, 420),
+    Theme       = "Darker",
+    Acrylic     = false,
+    Search      = true,
+    MinimizeKey = Enum.KeyCode.RightShift,
 })
 if not Window then warn("[VD Hub] Window failed"); return end
+print("[VD Hub] Building tabs...")
 
 local tabSurv   = Window:AddTab({ Title="Survivor",    Icon="solar/user-bold" })
 local tabKiller = Window:AddTab({ Title="Killer",      Icon="solar/swords-bold" })
@@ -3691,102 +3691,103 @@ if not (tabSurv and tabKiller and tabAim and tabESP and tabVisual and tabUI) the
     warn("[VD Hub] Tabs failed"); return
 end
 
-local function N(t,c,tp,d) Fluent:Notify({Title=t,Content=c,Type=tp or "Info",Duration=d or 2}) end
+local function N(t,c,tp,d)
+    pcall(function() Fluent:Notify({Title=t,Content=c,Type=tp or "Info",Duration=d or 2}) end)
+end
 
 -- ===== SURVIVOR =====
-print("[VD Hub] Building UI tabs...")
-local secSkill = tabSurv:AddSection("Skill Check")
-secSkill:AddToggle("SkillCheck",{Title="Auto Skill Check",Default=false,
-    Callback=function(v) SC.SkillCheck.Enabled=v; if v then SC.startSkillCheck() else if SC.conn then SC.conn:Disconnect() end end end})
-secSkill:AddDropdown("SCMode",{Title="Mode",Values={"Instant","Legit","Random"},Default=2,
-    Callback=function(v) SC.SkillCheck.Mode=v end})
+print("[VD Hub] Building Survivor...")
+local s1 = tabSurv:AddSection("Skill Check")
+s1:AddToggle("SkillCheck",{
+    Title="Auto Skill Check", Default=false,
+    Callback=function(v)
+        SC.SkillCheck.Enabled=v
+        if v then SC.startSkillCheck()
+        else if SC.conn then SC.conn:Disconnect(); SC.conn=nil end end
+    end
+})
+s1:AddDropdown("SCMode",{
+    Title="Mode", Values={"Instant","Legit","Random"}, Default="Legit",
+    Callback=function(v) SC.SkillCheck.Mode=v end
+})
 
-local secParry = tabSurv:AddSection("Auto Parry")
-secParry:AddToggle("Parry",{Title="Auto Parry",Default=false,Callback=function(v) Parry.Config.Enabled=v end})
-secParry:AddSlider("ParryRange",{Title="Range",Min=5,Max=30,Default=15,Rounding=1,Callback=function(v) Parry.Config.Radius=v end})
-secParry:AddToggle("ParrySafety",{Title="Safety Mode",Default=true,Callback=function(v) Parry.Config.Safety=v end})
-secParry:AddToggle("ParryAggressive",{Title="Aggressive",Default=false,Callback=function(v) Parry.Config.Aggressive=v end})
-secParry:AddSlider("ParryFace",{Title="Face Threshold",Min=0,Max=1,Default=0.7,Rounding=0.1,Callback=function(v) Parry.Config.FaceThreshold=v end})
+local s2 = tabSurv:AddSection("Auto Parry")
+s2:AddToggle("Parry",{Title="Auto Parry",Default=false,Callback=function(v) Parry.Config.Enabled=v end})
+s2:AddSlider("ParryRange",{Title="Range",Min=5,Max=30,Default=15,Rounding=1,Callback=function(v) Parry.Config.Radius=v end})
+s2:AddToggle("ParrySafety",{Title="Safety Mode",Default=true,Callback=function(v) Parry.Config.Safety=v end})
+s2:AddToggle("ParryAgg",{Title="Aggressive",Default=false,Callback=function(v) Parry.Config.Aggressive=v end})
+s2:AddSlider("ParryFace",{Title="Face Threshold",Min=0,Max=1,Default=0.7,Rounding=0.1,Callback=function(v) Parry.Config.FaceThreshold=v end})
 
-local secSurvMisc = tabSurv:AddSection("Survivor Misc")
-secSurvMisc:AddToggle("AutoCrouch",{Title="Auto Dodge/Crouch",Default=false,Callback=function(v) Dodge.Config.Enabled=v end})
-secSurvMisc:AddToggle("FastVault",{Title="Fast Vault",Default=false,Callback=function(v)
-    if v then FVault.Enable() else FVault.Disable() end end})
-secSurvMisc:AddToggle("SelfHeal",{Title="Self Heal",Default=false,Callback=function(v) SAS.Config.SelfHeal=v end})
-secSurvMisc:AddToggle("SilentActions",{Title="Silent Actions",Default=false,Callback=function(v) SAS.Config.SilentActions=v end})
-secSurvMisc:AddToggle("AntiAura",{Title="Anti Aura",Default=false,Callback=function(v) SAS.Config.AntiAura=v end})
-secSurvMisc:AddToggle("MoonwalkTog",{Title="Moonwalk V3",Default=false,Callback=function(v)
-    if v then MW.Enable() else MW.Disable() end end})
-secSurvMisc:AddToggle("GenBypassTog",{Title="Gen Bypass",Default=false,Callback=function(v)
-    GenBP.GenBypass.Enabled=v; GenBP.GB_UpdateButton() end})
-secSurvMisc:AddToggle("KillerPredTog",{Title="Killer Prediction",Default=false,Callback=function(v)
-    if v then KP.Enable() else KP.Disable() end end})
+local s3 = tabSurv:AddSection("Survivor Misc")
+s3:AddToggle("AutoDodge",{Title="Auto Dodge/Crouch",Default=false,Callback=function(v) Dodge.Config.Enabled=v end})
+s3:AddToggle("FastVault",{Title="Fast Vault",Default=false,Callback=function(v) if v then FVault.Enable() else FVault.Disable() end end})
+s3:AddToggle("SelfHeal",{Title="Self Heal",Default=false,Callback=function(v) SAS.Config.SelfHeal=v end})
+s3:AddToggle("SilentAction",{Title="Silent Actions",Default=false,Callback=function(v) SAS.Config.SilentActions=v end})
+s3:AddToggle("AntiAura",{Title="Anti Aura",Default=false,Callback=function(v) SAS.Config.AntiAura=v end})
+s3:AddToggle("Moonwalk",{Title="Moonwalk V3",Default=false,Callback=function(v) if v then MW.Enable() else MW.Disable() end end})
+s3:AddToggle("GenBypass",{Title="Gen Bypass",Default=false,Callback=function(v) GenBP.GenBypass.Enabled=v; GenBP.GB_UpdateButton() end})
+s3:AddToggle("KillerPred",{Title="Killer Prediction",Default=false,Callback=function(v) if v then KP.Enable() else KP.Disable() end end})
 
 -- ===== KILLER =====
-local secKillerFeat = tabKiller:AddSection("Killer Features")
-secKillerFeat:AddToggle("DoubleDmg",{Title="Double Damage Gen",Default=false,Callback=function(v) DDmg.Config.Enabled=v end})
-secKillerFeat:AddToggle("AutoStalkTog",{Title="Auto Stalk",Default=false,Callback=function(v)
-    if v then Stalk.Start() else Stalk.Stop() end end})
-secKillerFeat:AddSlider("StalkRange",{Title="Stalk Range",Min=50,Max=300,Default=150,Rounding=0,
-    Callback=function(v) Stalk.Config.StalkRange=v end})
+print("[VD Hub] Building Killer...")
+local k1 = tabKiller:AddSection("Killer Features")
+k1:AddToggle("DoubleDmg",{Title="Double Damage Gen",Default=false,Callback=function(v) DDmg.Config.Enabled=v end})
+k1:AddToggle("AutoStalk",{Title="Auto Stalk",Default=false,Callback=function(v) if v then Stalk.Start() else Stalk.Stop() end end})
+k1:AddSlider("StalkRange",{Title="Stalk Range",Min=50,Max=300,Default=150,Rounding=0,Callback=function(v) Stalk.Config.StalkRange=v end})
 
-local secHitbox = tabKiller:AddSection("Hitbox Expander")
-secHitbox:AddToggle("HitboxTog",{Title="Hitbox Expander",Default=false,Callback=function(v)
-    if v then Hitbox.Start() else Hitbox.Stop() end end})
-secHitbox:AddSlider("HitboxSize",{Title="Size",Min=2,Max=50,Default=15,Rounding=0,
-    Callback=function(v) Hitbox.Config.Size=v end})
+local k2 = tabKiller:AddSection("Hitbox Expander")
+k2:AddToggle("HitboxTog",{Title="Hitbox Expander",Default=false,Callback=function(v) if v then Hitbox.Start() else Hitbox.Stop() end end})
+k2:AddSlider("HitboxSz",{Title="Size",Min=2,Max=50,Default=15,Rounding=0,Callback=function(v) Hitbox.Config.Size=v end})
 
-local secSpearUI = tabKiller:AddSection("Spear Aim")
-secSpearUI:AddToggle("SpearTog",{Title="Spear Aim",Default=false,Callback=function(v) Spear.Config.Enabled=v end})
-secSpearUI:AddSlider("SpearGrav",{Title="Gravity",Min=10,Max=200,Default=50,Rounding=0,Callback=function(v) Spear.Config.Gravity=v end})
-secSpearUI:AddSlider("SpearSpd",{Title="Speed",Min=20,Max=300,Default=100,Rounding=0,Callback=function(v) Spear.Config.Speed=v end})
-secSpearUI:AddToggle("SnaplineTog",{Title="Show Snapline",Default=true,Callback=function(v) Spear.Config.ShowSnapline=v end})
+local k3 = tabKiller:AddSection("Spear Aim")
+k3:AddToggle("SpearTog",{Title="Spear Aim",Default=false,Callback=function(v) Spear.Config.Enabled=v end})
+k3:AddSlider("SpearGrav",{Title="Gravity",Min=10,Max=200,Default=50,Rounding=0,Callback=function(v) Spear.Config.Gravity=v end})
+k3:AddSlider("SpearSpd",{Title="Speed",Min=20,Max=300,Default=100,Rounding=0,Callback=function(v) Spear.Config.Speed=v end})
+k3:AddToggle("Snapline",{Title="Show Snapline",Default=true,Callback=function(v) Spear.Config.ShowSnapline=v end})
 
-local secMaskUI = tabKiller:AddSection("Mask Selection")
-secMaskUI:AddToggle("MaskTog",{Title="Mask Selection GUI",Default=false,Callback=function(v)
-    if v then Mask.Show() else Mask.Hide() end end})
-secMaskUI:AddParagraph({Title="Keys",Content="1-6: mask | 7: deactivate | M: minimize"})
+local k4 = tabKiller:AddSection("Mask Selection")
+k4:AddToggle("MaskTog",{Title="Mask Selection GUI",Default=false,Callback=function(v) if v then Mask.Show() else Mask.Hide() end end})
 
 -- ===== AIM =====
-local secToF = tabAim:AddSection("Silent Aim ToF")
-secToF:AddToggle("SAToF",{Title="Silent Aim ToF",Default=false,Callback=function(v) SAToF.Config.Enabled=v end})
-secToF:AddToggle("SABlock",{Title="Block when Knocked",Default=false,Callback=function(v) SAToF.Config.BlockKnocked=v end})
-secToF:AddToggle("SALock",{Title="Lock Aim",Default=false,Callback=function(v) SAToF.Config.LockAim=v end})
-secToF:AddToggle("SAFOVMode",{Title="FOV Mode",Default=false,Callback=function(v) SAToF.Config.FOVMode=v end})
-secToF:AddToggle("SAShowFOV",{Title="Show FOV Circle",Default=false,Callback=function(v) SAToF.Config.ShowFOV=v end})
-secToF:AddSlider("SAFOV",{Title="FOV Radius",Min=30,Max=500,Default=150,Rounding=5,Callback=function(v) SAToF.Config.FOV=v end})
-secToF:AddDropdown("SATarget",{Title="Target",Values={"Killer","Survivor"},Default=1,Callback=function(v) SAToF.Config.Target=v end})
-secToF:AddDropdown("SAPart",{Title="Target Part",Values={"Torso","Head","Root"},Default=1,Callback=function(v) SAToF.Config.TargetPart=v end})
-secToF:AddToggle("SAHideLaser",{Title="Hide Laser",Default=false,Callback=function(v) SAToF.Config.HideLaser=v end})
+print("[VD Hub] Building Aim...")
+local a1 = tabAim:AddSection("Silent Aim ToF")
+a1:AddToggle("SAToF",{Title="Silent Aim ToF",Default=false,Callback=function(v) SAToF.Config.Enabled=v end})
+a1:AddToggle("SABlock",{Title="Block when Knocked",Default=false,Callback=function(v) SAToF.Config.BlockKnocked=v end})
+a1:AddToggle("SALock",{Title="Lock Aim",Default=false,Callback=function(v) SAToF.Config.LockAim=v end})
+a1:AddToggle("SAFOVMode",{Title="FOV Mode",Default=false,Callback=function(v) SAToF.Config.FOVMode=v end})
+a1:AddToggle("SAShowFOV",{Title="Show FOV Circle",Default=false,Callback=function(v) SAToF.Config.ShowFOV=v end})
+a1:AddSlider("SAFOV",{Title="FOV Radius",Min=30,Max=500,Default=150,Rounding=5,Callback=function(v) SAToF.Config.FOV=v end})
+a1:AddDropdown("SATarget",{Title="Target",Values={"Killer","Survivor"},Default="Killer",Callback=function(v) SAToF.Config.Target=v end})
+a1:AddDropdown("SAPart",{Title="Target Part",Values={"Torso","Head","Root"},Default="Torso",Callback=function(v) SAToF.Config.TargetPart=v end})
+a1:AddToggle("SALaser",{Title="Hide Laser",Default=false,Callback=function(v) SAToF.Config.HideLaser=v end})
 
 -- ===== ESP =====
-local secESPUI = tabESP:AddSection("ESP Settings")
-secESPUI:AddToggle("ESPMain",{Title="Enable ESP",Default=false,Callback=function(v)
-    ESP.Config.Enabled=v; if v then ESP.Start() else ESP.Stop() end end})
-secESPUI:AddToggle("ESPSurv",{Title="Survivor",Default=true,Callback=function(v) ESP.Config.Survivor=v end})
-secESPUI:AddToggle("ESPKill",{Title="Killer",Default=true,Callback=function(v) ESP.Config.Killer=v end})
-secESPUI:AddToggle("ESPGen",{Title="Generator",Default=true,Callback=function(v) ESP.Config.Generator=v end})
-secESPUI:AddToggle("ESPGate",{Title="Gate + Timer",Default=true,Callback=function(v) ESP.Config.Gate=v end})
-secESPUI:AddToggle("ESPPallet",{Title="Pallet",Default=true,Callback=function(v) ESP.Config.Pallet=v end})
-secESPUI:AddToggle("ESPWindow",{Title="Window",Default=true,Callback=function(v) ESP.Config.Window=v end})
-secESPUI:AddToggle("ESPSCP",{Title="SCP",Default=false,Callback=function(v) ESP.Config.SCP=v end})
-secESPUI:AddSlider("ESPDist",{Title="Max Distance",Min=100,Max=10000,Default=5000,Rounding=0,
-    Callback=function(v) ESP.Config.Distance=v end})
-secESPUI:AddButton({Title="Refresh ESP",Callback=function() ESP.SetLastUpdate(0) end})
+print("[VD Hub] Building ESP...")
+local e1 = tabESP:AddSection("ESP Settings")
+e1:AddToggle("ESPMain",{Title="Enable ESP",Default=false,Callback=function(v) ESP.Config.Enabled=v; if v then ESP.Start() else ESP.Stop() end end})
+e1:AddToggle("ESPSurv",{Title="Survivor",Default=true,Callback=function(v) ESP.Config.Survivor=v end})
+e1:AddToggle("ESPKill",{Title="Killer",Default=true,Callback=function(v) ESP.Config.Killer=v end})
+e1:AddToggle("ESPGen",{Title="Generator + Progress",Default=true,Callback=function(v) ESP.Config.Generator=v end})
+e1:AddToggle("ESPGate",{Title="Gate + Timer",Default=true,Callback=function(v) ESP.Config.Gate=v end})
+e1:AddToggle("ESPPallet",{Title="Pallet",Default=true,Callback=function(v) ESP.Config.Pallet=v end})
+e1:AddToggle("ESPWin",{Title="Window (Vault)",Default=true,Callback=function(v) ESP.Config.Window=v end})
+e1:AddToggle("ESPSCP",{Title="SCP",Default=false,Callback=function(v) ESP.Config.SCP=v end})
+e1:AddSlider("ESPDist",{Title="Max Distance",Min=100,Max=10000,Default=5000,Rounding=0,Callback=function(v) ESP.Config.Distance=v end})
+e1:AddButton({Title="Refresh ESP",Callback=function() ESP.SetLastUpdate(0) end})
 
 -- ===== VISUAL =====
-local secVisUI = tabVisual:AddSection("Visual Settings")
-secVisUI:AddToggle("NoShadow",{Title="No Shadow",Default=false,Callback=function(v) Visuals.SetNoShadow(v) end})
-secVisUI:AddToggle("Fullbright",{Title="Fullbright",Default=false,Callback=function(v) Visuals.SetFullbright(v) end})
-secVisUI:AddToggle("ReduceMap",{Title="Reduce Map (Potato)",Default=false,Callback=function(v) Visuals.SetReduceMap(v) end})
-secVisUI:AddToggle("FPSCounter",{Title="FPS & Ping Counter",Default=false,Callback=function(v)
-    if v then Visuals.StartCounter() else Visuals.StopCounter() end end})
+print("[VD Hub] Building Visual...")
+local v1 = tabVisual:AddSection("Visual Settings")
+v1:AddToggle("NoShadow",{Title="No Shadow",Default=false,Callback=function(v) Visuals.SetNoShadow(v) end})
+v1:AddToggle("Fullbright",{Title="Fullbright",Default=false,Callback=function(v) Visuals.SetFullbright(v) end})
+v1:AddToggle("ReduceMap",{Title="Reduce Map (Potato)",Default=false,Callback=function(v) Visuals.SetReduceMap(v) end})
+v1:AddToggle("FPSCounter",{Title="FPS & Ping Counter",Default=false,Callback=function(v) if v then Visuals.StartCounter() else Visuals.StopCounter() end end})
 
-local secMorphUI = tabVisual:AddSection("Morphs")
-secMorphUI:AddToggle("KorbloxTog",{Title="Korblox",Default=false,Callback=function(v)
-    if v then Morphs.Korblox.Enable() else Morphs.Korblox.Disable() end end})
+local v2 = tabVisual:AddSection("Morphs")
+v2:AddToggle("Korblox",{Title="Korblox",Default=false,Callback=function(v) if v then Morphs.Korblox.Enable() else Morphs.Korblox.Disable() end end})
 
 -- ===== UI SETTINGS =====
+print("[VD Hub] Building UI Settings...")
 pcall(function()
     if Fluent.InterfaceManager and tabUI then
         Fluent.InterfaceManager:SetLibrary(Fluent)
@@ -3804,6 +3805,5 @@ pcall(function()
         pcall(function() Fluent.SaveManager:LoadAutoloadConfig() end)
     end
 end)
-
 print("[VD Hub] Ready!")
 N("VD Hub", "Violent District loaded!", "Success", 4)
