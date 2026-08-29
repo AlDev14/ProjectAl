@@ -19,6 +19,35 @@ local Window = Fluent:CreateWindow({
 if not Window then warn("[Test] Window failed"); return end
 print("[Test] Window OK")
 
+-- Debug: cek ScreenGui
+task.wait(0.5)
+pcall(function()
+    local CoreGui = game:GetService("CoreGui")
+    local PlayerGui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    
+    -- Cek di mana GUI berada
+    for _, sg in ipairs(CoreGui:GetChildren()) do
+        if sg:IsA("ScreenGui") then
+            print("[Test] CoreGui ScreenGui: "..sg.Name.." Enabled="..tostring(sg.Enabled))
+        end
+    end
+    if PlayerGui then
+        for _, sg in ipairs(PlayerGui:GetChildren()) do
+            if sg:IsA("ScreenGui") then
+                print("[Test] PlayerGui ScreenGui: "..sg.Name.." Enabled="..tostring(sg.Enabled))
+            end
+        end
+    end
+    
+    -- Cek Fluent.GUI
+    if Fluent.GUI then
+        print("[Test] Fluent.GUI: "..Fluent.GUI.Name.." Parent="..tostring(Fluent.GUI.Parent))
+        print("[Test] Fluent.GUI.Enabled="..tostring(Fluent.GUI.Enabled))
+    else
+        print("[Test] Fluent.GUI = nil!")
+    end
+end)
+
 local tab1 = Window:AddTab({ Title="Tab 1", Icon="solar/user-bold" })
 local tab2 = Window:AddTab({ Title="Tab 2", Icon="solar/eye-bold" })
 if not tab1 or not tab2 then warn("[Test] Tabs failed"); return end
