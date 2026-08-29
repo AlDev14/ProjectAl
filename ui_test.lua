@@ -74,4 +74,14 @@ sec2:AddToggle("Toggle2",{Title="Another Toggle",Default=true,Callback=function(
 print("[Test] Tab2 Section OK")
 
 Fluent:Notify({Title="UI Test",Content="All elements loaded!",Type="Success",Duration=3})
+-- Paksa show window
+pcall(function()
+    if Window.Show then Window:Show() end
+    if Window.Root then Window.Root.Visible = true end
+    -- Paksa ScreenGui visible
+    if Fluent.GUI then
+        Fluent.GUI.Enabled = true
+        Fluent.GUI.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+    end
+end)
 print("[Test] ALL DONE!")
