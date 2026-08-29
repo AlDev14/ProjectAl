@@ -3276,7 +3276,9 @@ end
         clearESP = clearESP,
         getGateText = getGateText,
         Start = Start,
-        Stop = Stop,
+        Stop   = Stop,
+        GetLastUpdate = function() return _lastUpdate end,
+        SetLastUpdate = function(v) _lastUpdate = v end,
     }
 end)()
 
@@ -3666,13 +3668,15 @@ end)()
 -- UI (FluentUI)
 -- ============================================================
 local Window = Fluent:CreateWindow({
-    Title    = "VD Hub",
-    SubTitle = "Violent District",
-    TabWidth = 140,
-    Size     = UDim2.fromOffset(580, 420),
-    Theme    = "Darker",
-    Acrylic  = false,
-    Search   = true,
+    Title         = "VD Hub",
+    SubTitle      = "Violent District",
+    TabWidth      = 140,
+    Size          = UDim2.fromOffset(580, 420),
+    Theme         = "Darker",
+    Acrylic       = false,
+    Search        = true,
+    MinimizeKey   = Enum.KeyCode.RightShift,
+    ToggleButton  = true,
 })
 if not Window then warn("[VD Hub] Window failed"); return end
 
@@ -3690,6 +3694,7 @@ end
 local function N(t,c,tp,d) Fluent:Notify({Title=t,Content=c,Type=tp or "Info",Duration=d or 2}) end
 
 -- ===== SURVIVOR =====
+print("[VD Hub] Building UI tabs...")
 local secSkill = tabSurv:AddSection("Skill Check")
 secSkill:AddToggle("SkillCheck",{Title="Auto Skill Check",Default=false,
     Callback=function(v) SC.SkillCheck.Enabled=v; if v then SC.startSkillCheck() else if SC.conn then SC.conn:Disconnect() end end end})
@@ -3767,7 +3772,7 @@ secESPUI:AddToggle("ESPWindow",{Title="Window",Default=true,Callback=function(v)
 secESPUI:AddToggle("ESPSCP",{Title="SCP",Default=false,Callback=function(v) ESP.Config.SCP=v end})
 secESPUI:AddSlider("ESPDist",{Title="Max Distance",Min=100,Max=10000,Default=5000,Rounding=0,
     Callback=function(v) ESP.Config.Distance=v end})
-secESPUI:AddButton({Title="Refresh ESP",Callback=function() ESP._lastUpdate=0 end})
+secESPUI:AddButton({Title="Refresh ESP",Callback=function() ESP.SetLastUpdate(0) end})
 
 -- ===== VISUAL =====
 local secVisUI = tabVisual:AddSection("Visual Settings")
