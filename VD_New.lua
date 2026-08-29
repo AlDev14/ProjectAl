@@ -1527,6 +1527,8 @@ if not _fn then warn("[VD Hub] loadstring error: "..tostring(_err)); return end
 local ok, Fluent = pcall(_fn)
 if not ok or not Fluent then warn("[VD Hub] FluentPro error: "..tostring(Fluent)); return end
 print("[VD Hub] UI loaded OK")
+print("[VD Hub] Fluent type=" .. type(Fluent))
+print("[VD Hub] CreateWindow=" .. tostring(type(Fluent.CreateWindow)))
 
 -- ============================================================
 -- UI - WINDOW
@@ -1541,6 +1543,8 @@ local Window = Fluent:CreateWindow({
     Search   = true,
 })
 if not Window then warn("[VD Hub] Window failed"); return end
+print("[VD Hub] Window OK type=" .. type(Window))
+print("[VD Hub] AddTab=" .. tostring(type(Window.AddTab)))
 
 local tabSurv   = Window:AddTab({ Title="Survivor",    Icon="solar/user-bold" })
 local tabKiller = Window:AddTab({ Title="Killer",      Icon="solar/swords-bold" })
@@ -1549,16 +1553,21 @@ local tabESP    = Window:AddTab({ Title="ESP",         Icon="solar/eye-bold" })
 local tabMisc   = Window:AddTab({ Title="Misc",        Icon="solar/widget-bold" })
 local tabUI     = Window:AddTab({ Title="UI Settings", Icon="solar/settings-bold" })
 
+print("[VD Hub] tabSurv=" .. tostring(tabSurv~=nil))
+print("[VD Hub] tabKiller=" .. tostring(tabKiller~=nil))
+print("[VD Hub] tabAim=" .. tostring(tabAim~=nil))
 if not (tabSurv and tabKiller and tabAim and tabESP and tabMisc and tabUI) then
     warn("[VD Hub] Tabs failed"); return
 end
+print("[VD Hub] All tabs OK")
 
 local function N(t,c,d,tp) Fluent:Notify({Title=t,Content=c,Duration=d or 2,Type=tp or "Info"}) end
 
 -- ============================================================
 -- UI - SURVIVOR
 -- ============================================================
-local secSkill = tabSurv:AddSection("Skill Check")
+local secSkill = tabSurv:AddSection("Skill Check", "solar/check-circle-bold")
+print("[VD Hub] secSkill=" .. tostring(secSkill~=nil) .. " AddToggle=" .. tostring(secSkill and type(secSkill.AddToggle)))
 secSkill:AddToggle("SkillCheck", {
     Title="Auto Skill Check", Default=VD.AutoSkillcheck,
     Callback=function(v) VD.AutoSkillcheck=v; if v then startSkillCheck() else if SkillConn then SkillConn:Disconnect() end end end
@@ -1811,5 +1820,91 @@ end)
 -- ============================================================
 -- FINISH
 -- ============================================================
+    local function createFloatingButton()
+        Fluent.FloatingButtonManager:SetLibrary(Fluent)
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "WisnuHub_FloatingBtn"
+        screenGui.ResetOnSpawn = false
+        screenGui.IgnoreGuiInset = true
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        screenGui.Parent = CoreGui
+
+        local btn = Instance.new("ImageButton")
+        btn.Size = UDim2.new(0, 50, 0, 50)
+        btn.AnchorPoint = Vector2.new(0, 0)
+        btn.BackgroundTransparency = 1
+        btn.BorderSizePixel = 0
+        btn.Parent = screenGui
+
+        local viewport = Camera.ViewportSize
+        btn.Position = UDim2.new(0, viewport.X - 50 - 16, 0, viewport.Y - 50 - 16)
+
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundTransparency = 1
+        bg.BorderSizePixel = 0
+        bg.Parent = btn
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = bg
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1.5
+        stroke.Color = Color3.fromRGB(255, 255, 255)
+        stroke.Transparency = 1
+        stroke.Parent = bg
+
+        local icon = Instance.new("ImageLabel")
+        icon.Size = UDim2.new(0, 32, 0, 32)
+        icon.Position = UDim2.new(0.5, -16, 0.5, -16)
+        icon.BackgroundTransparency = 1
+        icon.Image = "rbxassetid://80668677085388"
+        icon.ScaleType = Enum.ScaleType.Fit
+        icon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        icon.Parent = bg
+
+        local dragging = false
+        local dragStartMouse = Vector2.new()
+        local dragStartPos = Vector2.new()
+
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStartMouse = input.Position
+                dragStartPos = Vector2.new(btn.Position.X.Offset, btn.Position.Y.Offset)
+            end
+        end)
+
+        btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+                local delta = input.Position - dragStartMouse
+                local newX = math.clamp(dragStartPos.X + delta.X, 0, Camera.ViewportSize.X - btn.Size.X.Offset)
+                local newY = math.clamp(dragStartPos.Y + delta.Y, 0, Camera.ViewportSize.Y - btn.Size.Y.Offset)
+                btn.Position = UDim2.new(0, newX, 0, newY)
+            end
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            if Window.Root.Visible then
+                Window:Minimize()
+            else
+                Window:Show()
+            end
+        end)
+
+        pcall(function()
+            Fluent.FloatingButtonManager:AddButton("WisnuHubBtn", btn, false, true)
+        end)
+    end
+    createFloatingButton()
+
 print("[VD Hub] Ready!")
 N("VD Hub", "Violent District loaded!", 4, "Success")
