@@ -444,6 +444,67 @@ LocalPlayer.Idled:Connect(function()
     end)
 end)
 
+-- ============================================================
+-- HEARTBEAT SPOOF — jaga Humanoid tetap normal di tiap frame
+-- Agar tidak trigger CharacterClient: Integrity check
+-- ============================================================
+local function getHumanoid()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local _savedWalkSpeed = nil
+local _integrityConn = nil
+
+local function startIntegritySpoof()
+    if _integrityConn then return end
+    _integrityConn = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local h = char:FindFirstChildOfClass("Humanoid")
+        if not h then return end
+
+        -- Simpan WalkSpeed asli game (set oleh SpeedPower)
+        -- Jangan pernah override — hanya baca dan cache
+        if h.WalkSpeed > 0 then
+            _savedWalkSpeed = h.WalkSpeed
+        end
+
+        -- Kalau ada BodyMover yang tidak kita buat → hapus (mencegah velocity injection)
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") then
+                if obj.Name ~= "SV_Speed" then  -- bukan punya kita
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end
+
+        -- Kalau tidak sedang gerak (idle) → pastikan MoveDirection nol
+        -- Ini prevent "drift" yang bisa trigger integrity
+        if not State.running and h.MoveDirection.Magnitude < 0.01 then
+            pcall(function() h:Move(Vector3.zero, false) end)
+        end
+    end)
+end
+
+local function stopIntegritySpoof()
+    if _integrityConn then
+        _integrityConn:Disconnect()
+        _integrityConn = nil
+    end
+end
+
+-- Start spoof saat script load
+startIntegritySpoof()
+print("[SAE] Integrity spoof active")
+
+-- Restart spoof kalau karakter respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    stopIntegritySpoof()
+    task.wait(1)
+    startIntegritySpoof()
+end)
+
 -- Carry state listener
 if EggCmds and EggCmds.AreaEggCarryStateChanged then
     pcall(function()
