@@ -486,6 +486,6 @@ secSet:AddButton({
     end,
 })
 
-Window:Show()
+-- Window auto-shown by VVind-UI
 Notify("Steal An Egg", "Loaded — AlDev14", "success", 4)
 print("[SAE] VVind-UI script loaded")
