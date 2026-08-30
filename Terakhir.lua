@@ -210,6 +210,74 @@ Onyx.Callbacks.OnSuccess = function()
     end
 
     -- ============================================================
+    -- FAKE AVATAR (KORLESS MORPH)
+    -- ============================================================
+    local KorlessMorph = { Enabled = false, Connection = nil }
+
+    local function ApplyKorless()
+        local plr = game.Players.LocalPlayer
+        local function Morph()
+            repeat task.wait()
+            until plr.Character
+                and plr.Character:FindFirstChild("HumanoidRootPart")
+                and plr.Character:FindFirstChild("Right Leg")
+            task.wait(0.1)
+            local char = plr.Character
+            pcall(function()
+                char.Head.Transparency = 1
+                local face = char.Head:FindFirstChild("face")
+                if face then face:Destroy() end
+                char["Right Leg"].Transparency = 1
+                -- Hapus KorlessHead lama kalau ada
+                local old = char:FindFirstChild("KorlessHead")
+                if old then old:Destroy() end
+                local mesh = Instance.new("MeshPart")
+                mesh.Name = "KorlessHead"
+                mesh.Size = Vector3.new(1.5, 1.5, 1.5)
+                mesh.CanCollide = false
+                mesh.MeshId = "rbxassetid://902942096"
+                mesh.TextureID = "rbxassetid://902843398"
+                mesh.CFrame = char["Right Leg"].CFrame * CFrame.new(0, 0.5, 0)
+                mesh.Parent = char
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = char["Right Leg"]
+                weld.Part1 = mesh
+                weld.Parent = mesh
+            end)
+        end
+        Morph()
+        if KorlessMorph.Connection then KorlessMorph.Connection:Disconnect() end
+        KorlessMorph.Connection = plr.CharacterAdded:Connect(function()
+            task.wait(1); Morph()
+        end)
+    end
+
+    local function RemoveKorless()
+        if KorlessMorph.Connection then
+            KorlessMorph.Connection:Disconnect()
+            KorlessMorph.Connection = nil
+        end
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            -- Restore head
+            char.Head.Transparency = 0
+            local face = char.Head:FindFirstChild("face")
+            if not face then
+                local f = Instance.new("Decal")
+                f.Name = "face"
+                f.Texture = "rbxasset://textures/face.png"
+                f.Parent = char.Head
+            end
+            -- Restore right leg
+            char["Right Leg"].Transparency = 0
+            -- Remove mesh
+            local mesh = char:FindFirstChild("KorlessHead")
+            if mesh then mesh:Destroy() end
+        end)
+    end
+
+    -- ============================================================
     -- ESP SYSTEM
     -- ============================================================
     local highlights = {}
@@ -3285,6 +3353,24 @@ Onyx.Callbacks.OnSuccess = function()
     -- ============================================================
     -- UI MISC
     -- ============================================================
+    local secFakeAva = mkSec(tabMisc, "Fake Avatar", "Lucide:user-round-x")
+    secFakeAva:AddToggle({
+        Text    = "Korless Morph",
+        Description = "Sembunyikan head + ganti dengan Korless mask",
+        Default = false,
+        Flag    = "KorlessMorph",
+        Callback = function(v)
+            KorlessMorph.Enabled = v
+            if v then
+                ApplyKorless()
+                Notify("Fake Avatar", "Korless Morph ON", "success", 2)
+            else
+                RemoveKorless()
+                Notify("Fake Avatar", "Morph removed", "info", 2)
+            end
+        end,
+    })
+
     local secCutscene = mkSec(tabMisc, "Cutscene", "Lucide:film")
     secCutscene:AddToggle({ Text = "Skip Cutscene",
         Default = VD.SkipCutscene,
