@@ -1,0 +1,492 @@
+-- ============================================================
+--  STEAL AN EGG — VVind-UI
+--  Auto Farm: smooth lerp movement (anti-BAC)
+--  Remote: EggCmds (Shared.Remotes new system)
+--  Author: AlDev14
+-- ============================================================
+
+-- AC Bypass (filtergc + metatable freeze)
+local function bypassClientDetections()
+    if typeof(filtergc) ~= "function" or typeof(debug) ~= "table" or typeof(debug.getupvalues) ~= "function" then
+        return false, "no filtergc"
+    end
+    local ok, fn = pcall(function()
+        return filtergc("function", { Constants = { "gmatch", "GetFullName" } }, true)
+    end)
+    if not ok or type(fn) ~= "function" then return false, "filter miss" end
+    local setMeta = (typeof(setrawmetatable) == "function" and setrawmetatable)
+        or (typeof(setmetatable) == "function" and setmetatable)
+    if not setMeta then return false, "no setmeta" end
+    local blocked = 0
+    local okUv, ups = pcall(debug.getupvalues, fn)
+    if not okUv or type(ups) ~= "table" then return false, "no upvalues" end
+    for _, tbl in pairs(ups) do
+        if typeof(tbl) == "table" then
+            local okSet = pcall(setMeta, tbl, { __newindex = function() end })
+            if okSet then blocked += 1 end
+        end
+    end
+    return blocked > 0, blocked
+end
+local acOk, acInfo = bypassClientDetections()
+print("[SAE] AC bypass:", acOk, acInfo)
+
+-- Load VVind-UI
+local VindUI
+do
+    local ok, r = pcall(function()
+        return loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/Skinny-yz/VVind-UI/refs/heads/main/src.lua"
+        ))()
+    end)
+    if ok and r then VindUI = r
+    else warn("[SAE] VVind-UI gagal load: "..tostring(r)); return end
+end
+
+-- Services
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace         = game:GetService("Workspace")
+local VirtualUser       = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+local TRAVEL_SPEED = 24  -- studs/s lerp speed (sedikit di atas normal, tidak mencolok)
+local HOLD_WAIT    = 0.6  -- simulate hold duration
+
+-- Notify helper
+local function Notify(title, text, ntype, dur)
+    pcall(function()
+        VindUI:Notify({ Title=title, Text=text, Type=ntype or "info", Duration=dur or 3 })
+    end)
+end
+
+-- State
+local State = {
+    running   = false,
+    busy      = false,
+    carrying  = false,
+    status    = "Idle",
+    lastSteal = 0,
+    stealCount = 0,
+}
+
+-- ============================================================
+-- GAME MODULES (new Shared.Remotes system)
+-- ============================================================
+local EggCmds, PlotCmds, Guard, Lookup, Network
+
+local function loadModules()
+    local Lib     = ReplicatedStorage:WaitForChild("Library", 20)
+    if not Lib then return false end
+    local Client  = Lib:WaitForChild("Client", 10)
+    local Util    = Lib:WaitForChild("Util", 10)
+
+    local function soft(inst)
+        if not inst then return nil end
+        local ok, r = pcall(require, inst)
+        return ok and r or nil
+    end
+
+    EggCmds  = soft(Client:FindFirstChild("EggCmds"))
+    PlotCmds = soft(Client:FindFirstChild("PlotCmds"))
+    Guard    = soft(Client:FindFirstChild("ToolGameplayGuard"))
+    Lookup   = soft(Util and Util:FindFirstChild("GuardAreaLookupUtil"))
+    Network  = soft(ReplicatedStorage:FindFirstChild("Packages") and
+                    ReplicatedStorage.Packages:FindFirstChild("Networking"))
+
+    return EggCmds ~= nil and PlotCmds ~= nil
+end
+
+local modulesOK = loadModules()
+if not modulesOK then
+    Notify("SAE", "Game modules tidak tersedia", "error", 5)
+    warn("[SAE] Modules unavailable")
+end
+
+-- ============================================================
+-- MOVEMENT — smooth lerp (tidak write WalkSpeed)
+-- ============================================================
+local function root()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function zeroVel(hrp)
+    if not hrp then return end
+    pcall(function()
+        hrp.AssemblyLinearVelocity  = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+local function smoothLerp(goal, speed)
+    local hrp = root()
+    if not hrp or not goal then return false end
+    speed = speed or TRAVEL_SPEED
+    local dist = (hrp.Position - goal).Magnitude
+    if dist < 2 then return true end
+    local steps = math.max(8, math.floor(dist / speed * 60))
+    local from = hrp.Position
+    for i = 1, steps do
+        if not State.running then return false end
+        hrp = root()
+        if not hrp then return false end
+        local alpha = i / steps
+        local p = from:Lerp(goal, alpha)
+        local newCF = CFrame.new(p.X, math.max(p.Y, hrp.Position.Y), p.Z)
+        hrp.CFrame = newCF
+        zeroVel(hrp)
+        -- fire pivot ke server kalau tersedia
+        if Network then
+            pcall(function()
+                local NetMap = Network.NET_MAP or {}
+                local pivotKey = (NetMap.ClientCharacter and NetMap.ClientCharacter.SET_PIVOT)
+                    or "ClientCharacter: SetPivot"
+                Network.Fire(pivotKey, newCF)
+            end)
+        end
+        task.wait(1/60)
+    end
+    return true
+end
+
+local function walkTo(goal, speed)
+    if typeof(goal) ~= "Vector3" then
+        goal = goal and goal.Position
+    end
+    if not goal then return false end
+    return smoothLerp(goal + Vector3.new(0, 2, 0), speed)
+end
+
+-- ============================================================
+-- GAME HELPERS
+-- ============================================================
+local SeparationLine = nil
+
+local function getSeparationLine()
+    if SeparationLine and SeparationLine.Parent then return SeparationLine end
+    local objs = Workspace:FindFirstChild("__OBJECTS")
+    if objs then
+        local areas = objs:FindFirstChild("Areas")
+        SeparationLine = areas and areas:FindFirstChild("SeparationLine")
+    end
+    return SeparationLine
+end
+
+local function onGameplaySide(pos)
+    local line = getSeparationLine()
+    if not line or not pos then return false end
+    if Lookup and type(Lookup.IsInGameplaySide) == "function" then
+        return Lookup.IsInGameplaySide(line, pos) == true
+    end
+    local rel = line.CFrame:PointToObjectSpace(pos)
+    return rel.Z > 0
+end
+
+local function inGameplay()
+    if Guard and type(Guard.IsLocalPlayerInGameplayArea) == "function" then
+        return Guard.IsLocalPlayerInGameplayArea() == true
+    end
+    return false
+end
+
+local function crossToArena()
+    if inGameplay() then return true end
+    local line = getSeparationLine()
+    if not line then return false end
+    local safePos = line.Position - Vector3.new(55, 0, 0)
+    local playPos = line.Position + Vector3.new(55, 4, 0)
+    State.status = "Masuk arena"
+    walkTo(safePos)
+    walkTo(playPos)
+    task.wait(0.2)
+    return inGameplay()
+end
+
+local function listEggs()
+    if not EggCmds then return {} end
+    local snap
+    pcall(function()
+        if type(EggCmds.GetAreaEggSnapshot) == "function" then
+            snap = EggCmds.GetAreaEggSnapshot()
+        end
+        if not snap and type(EggCmds.RequestAreaEggSnapshot) == "function" then
+            snap = EggCmds.RequestAreaEggSnapshot()
+        end
+    end)
+    local hrp = root()
+    local list = {}
+    for _, rec in pairs((snap and snap.Records) or {}) do
+        if type(rec) == "table" and rec.State == "Slot" and type(rec.Uid) == "string" then
+            local pos = rec.BottomCFrame and rec.BottomCFrame.Position
+            if pos and onGameplaySide(pos) then
+                local dist = hrp and (pos - hrp.Position).Magnitude or math.huge
+                table.insert(list, { rec=rec, dist=dist })
+            end
+        end
+    end
+    table.sort(list, function(a,b) return a.dist < b.dist end)
+    return list
+end
+
+local function eggIsCarried(uid)
+    if EggCmds and type(EggCmds.GetAreaEggRecord) == "function" and uid then
+        local rec = EggCmds.GetAreaEggRecord(uid)
+        if rec and rec.State == "Carried" then return true end
+    end
+    return State.carrying
+end
+
+local function waitCarrying(uid, timeout)
+    timeout = timeout or 5
+    local t0 = workspace.DistributedGameTime
+    while workspace.DistributedGameTime - t0 < timeout and State.running do
+        if eggIsCarried(uid) then return true end
+        task.wait(0.08)
+    end
+    return eggIsCarried(uid)
+end
+
+local function findPromptNear(pos, uid)
+    local function check(inst)
+        if not inst:IsA("ProximityPrompt") or not inst.Enabled then return false end
+        local part = inst.Parent
+        return part and part:IsA("BasePart") and pos and (part.Position - pos).Magnitude < 10
+    end
+    if uid then
+        local model = Workspace:FindFirstChild(uid, true)
+        if model then
+            local p = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if p then return p end
+        end
+    end
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if check(v) then return v end
+    end
+    return nil
+end
+
+-- ============================================================
+-- MAIN STEAL CYCLE
+-- ============================================================
+local function stealCycle()
+    if State.busy then return false end
+    State.busy = true
+
+    local ok, result = pcall(function()
+        -- 1. Masuk arena
+        if not crossToArena() then
+            Notify("SAE", "Gagal masuk arena", "warning")
+            return false
+        end
+
+        -- 2. Refresh snapshot
+        pcall(function()
+            if EggCmds and EggCmds.RequestAreaEggSnapshot then
+                EggCmds.RequestAreaEggSnapshot()
+            end
+        end)
+        task.wait(0.15)
+
+        -- 3. Cari telur terdekat
+        local eggs = listEggs()
+        if #eggs == 0 then
+            Notify("SAE", "Tidak ada telur di arena", "warning")
+            return false
+        end
+        local egg = eggs[1].rec
+        local uid = egg.Uid
+        local pos  = egg.BottomCFrame and egg.BottomCFrame.Position
+        if not pos then return false end
+
+        -- 4. Smooth lerp ke telur
+        State.status = "Jalan ke telur"
+        walkTo(pos, TRAVEL_SPEED)
+
+        -- 5. Simulate hold (0.6s) lalu fire carry
+        State.status = "Hold egg..."
+        task.wait(HOLD_WAIT)
+
+        -- Coba ProximityPrompt
+        local prompt = findPromptNear(pos, uid)
+        if prompt and prompt.Enabled then
+            if typeof(fireproximityprompt) == "function" then
+                pcall(fireproximityprompt, prompt, prompt.HoldDuration or 0.5)
+                task.wait((prompt.HoldDuration or 0.5) + 0.1)
+            else
+                pcall(function()
+                    prompt:InputHoldBegin()
+                    task.wait(prompt.HoldDuration or 0.5)
+                    prompt:InputHoldEnd()
+                end)
+            end
+        end
+
+        -- Coba EggCmds.RequestCarryAreaEgg
+        if not waitCarrying(uid, 1.5) then
+            pcall(function() EggCmds.RequestCarryAreaEgg(uid) end)
+            waitCarrying(uid, 2)
+        end
+
+        if not eggIsCarried(uid) then
+            Notify("SAE", "Gagal grab telur", "warning")
+            return false
+        end
+        State.carrying = true
+
+        -- 6. Balik ke plot (smooth lerp)
+        State.status = "Balik ke base"
+        local home = PlotCmds and PlotCmds.GetRespawnPointCFrame
+            and PlotCmds.GetRespawnPointCFrame(LocalPlayer)
+        if home then
+            local line = getSeparationLine()
+            if line and inGameplay() then
+                walkTo(line.Position - line.CFrame.LookVector * 38 + Vector3.new(0, 3, 0))
+            end
+            walkTo(home.Position + Vector3.new(0, 3, 0))
+        end
+
+        task.wait(1.5)
+        State.carrying = false
+        State.stealCount += 1
+        State.status = "Idle"
+        Notify("SAE", "Telur ke-"..State.stealCount.." berhasil!", "success", 2)
+        return true
+    end)
+
+    State.busy = false
+    if not ok then
+        warn("[SAE] Error:", result)
+        Notify("SAE", tostring(result):sub(1, 60), "error")
+    end
+    return result == true
+end
+
+-- Anti-AFK
+LocalPlayer.Idled:Connect(function()
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end)
+
+-- Carry state listener
+if EggCmds and EggCmds.AreaEggCarryStateChanged then
+    pcall(function()
+        EggCmds.AreaEggCarryStateChanged:Connect(function(payload)
+            if payload and payload.IsCarrying ~= nil then
+                State.carrying = payload.IsCarrying
+            end
+        end)
+    end)
+end
+
+-- ============================================================
+-- VVIND-UI
+-- ============================================================
+local Window = VindUI:CreateWindow({
+    Title      = "Steal An Egg",
+    Subtitle   = "by AlDev14",
+    Icon       = "Lucide:egg",
+    Size       = UDim2.fromOffset(520, 420),
+    MinSize    = Vector2.new(420, 340),
+    Draggable  = true,
+    Resizable  = true,
+    UseBlur    = false,
+    DefaultTab = "Farm",
+})
+
+-- TAB FARM
+local tabFarm = Window:AddTab({ Name = "Farm", Icon = "Lucide:zap" })
+local secFarm = tabFarm:AddSubTab({ Name = "Auto Steal", Icon = "Lucide:egg" })
+
+secFarm:AddParagraph({
+    Title = "Status",
+    Text  = "Toggle Auto Steal untuk mulai farm otomatis.",
+})
+
+secFarm:AddToggle({
+    Text     = "Auto Steal",
+    Default  = false,
+    Flag     = "autoSteal",
+    Callback = function(v)
+        State.running = v
+        if v then
+            Notify("SAE", "Auto Steal ON", "success", 2)
+            task.spawn(function()
+                while State.running do
+                    stealCycle()
+                    task.wait(1)
+                end
+                Notify("SAE", "Auto Steal OFF", "info", 2)
+            end)
+        end
+    end,
+})
+
+secFarm:AddButton({
+    Text     = "Steal Once",
+    Icon     = "Lucide:hand",
+    Callback = function()
+        task.spawn(stealCycle)
+    end,
+})
+
+secFarm:AddSlider({
+    Text      = "Travel Speed",
+    Min       = 12,
+    Max       = 32,
+    Default   = 24,
+    Increment = 1,
+    Flag      = "travelSpeed",
+    Callback  = function(v) TRAVEL_SPEED = v end,
+})
+
+secFarm:AddSlider({
+    Text      = "Hold Duration (s)",
+    Min       = 0.3,
+    Max       = 2.0,
+    Default   = 0.6,
+    Increment = 0.1,
+    Flag      = "holdWait",
+    Callback  = function(v) HOLD_WAIT = v end,
+})
+
+-- Status display
+local statusSec = tabFarm:AddSubTab({ Name = "Status", Icon = "Lucide:activity" })
+statusSec:AddSystemInfoGrid({ Description = "FPS & Ping" })
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function()
+            -- update status paragraph if possible
+        end)
+    end
+end)
+
+-- TAB SETTINGS
+local tabSet = Window:AddTab({ Name = "Settings", Icon = "Lucide:settings" })
+local secSet = tabSet:AddSubTab({ Name = "Config", Icon = "Lucide:save" })
+
+secSet:AddButton({
+    Text = "Save Config",
+    Icon = "Lucide:save",
+    Callback = function()
+        pcall(function() VindUI:SaveConfig("sae_hub") end)
+        Notify("Config", "Saved", "success", 2)
+    end,
+})
+secSet:AddButton({
+    Text = "Load Config",
+    Icon = "Lucide:folder-open",
+    Callback = function()
+        pcall(function() VindUI:LoadConfig("sae_hub", true) end)
+        Notify("Config", "Loaded", "success", 2)
+    end,
+})
+
+Window:Show()
+Notify("Steal An Egg", "Loaded — AlDev14", "success", 4)
+print("[SAE] VVind-UI script loaded")
