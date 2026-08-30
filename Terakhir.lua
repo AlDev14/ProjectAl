@@ -2752,11 +2752,36 @@ Onyx.Callbacks.OnSuccess = function()
     })
     homeInfo:AddSystemInfoGrid({ Description = "Live FPS, Ping & Executor" })
     local homeMusic = mkSec(tabHome, "Music", "Lucide:music-2")
-    Window:AddSpotifyPanel({
-        Title      = "Spotify Remote",
-        Icon       = "Lucide:music-2",
-        EmbedMode  = true,
-        AutoConnect = false,
+    homeMusic:AddParagraph({
+        Title = "Music Player",
+        Text  = "Play audio tracks below. Works on mobile.",
+    })
+    homeMusic:AddAudio({
+        Audio    = "rbxassetid://142376088",
+        Volume   = 0.5,
+        Looped   = true,
+        AutoPlay = false,
+        AudioTitle    = "Roblox Classic BGM",
+        AudioSubtitle = "By Roblox",
+        PlayOutsideWindow = false,
+    })
+    homeMusic:AddAudio({
+        Audio    = "rbxassetid://1843493556",
+        Volume   = 0.5,
+        Looped   = true,
+        AutoPlay = false,
+        AudioTitle    = "Pigstep",
+        AudioSubtitle = "Minecraft OST",
+        PlayOutsideWindow = false,
+    })
+    homeMusic:AddAudio({
+        Audio    = "rbxassetid://1843493556",
+        Volume   = 0.4,
+        Looped   = true,
+        AutoPlay = false,
+        AudioTitle    = "Chill Lo-Fi",
+        AudioSubtitle = "Background Music",
+        PlayOutsideWindow = true,
     })
 
     -- ============================================================
