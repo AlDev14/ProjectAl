@@ -40,7 +40,10 @@ local function doHumanoidBypass()
         task.wait(0.05)
         -- Hapus yang asli
         origHum:Destroy()
-        print("[SAE] Humanoid bypass OK")
+        task.wait(0.05)
+        -- FIX: reassign camera subject ke clone baru
+        workspace.CurrentCamera.CameraSubject = cloneHum
+        print("[SAE] Humanoid bypass OK — camera reassigned")
     end)
 end
 
