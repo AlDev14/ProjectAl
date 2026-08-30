@@ -46,16 +46,28 @@ Onyx.Shop = {
 
 Onyx.Callbacks.OnSuccess = function()
     -- ============================================================
-    -- SCRIPT UTAMA (FluentPro + Semua Fitur)
+    -- SCRIPT UTAMA (VVind-UI)
     -- ============================================================
-    local Success, Fluent = pcall(function()
-        return loadstring(game:HttpGet("https://github.com/StyearX/Fluent-modded/releases/download/1.5.1/FluentPro"))()
-    end)
-
-    if not Success or not Fluent then
-        warn("Gagal memuat FluentPro")
-        return
+    local VindUI
+    do
+        local ok, r = pcall(function()
+            return loadstring(game:HttpGet(
+                "https://raw.githubusercontent.com/Skinny-yz/VVind-UI/refs/heads/main/src.lua"
+            ))()
+        end)
+        if ok and r then VindUI = r
+        else warn("[WisnuHub] VVind-UI gagal load: "..tostring(r)); return end
     end
+
+    local function Notify(title, text, ntype, dur)
+        pcall(function()
+            VindUI:Notify({Title=title, Text=text, Type=ntype or "info", Duration=dur or 3})
+        end)
+    end
+    -- Fluent shim agar Fluent:Notify calls tidak error
+    local Fluent = { Notify = function(_, cfg)
+        Notify(cfg.Title or "", cfg.Content or cfg.Text or "", (cfg.Type or "info"):lower(), cfg.Duration or 3)
+    end }
 
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
@@ -2641,78 +2653,107 @@ Onyx.Callbacks.OnSuccess = function()
     end)
 
     -- ============================================================
-    -- WINDOW & TABS (FluentPro)
+    -- WINDOW & TABS (VVind-UI)
     -- ============================================================
-    local Window
-    if Fluent.Window then
-        Window = Fluent.Window
-    else
-        Window = Fluent:CreateWindow({
-            Title = "Wisnu Hub",
-            SubTitle = "ESP + Silent Aim + Survivor + Killer + Misc",
-            TabWidth = 130,
-            Size = UDim2.fromOffset(480, 380),
-            Acrylic = true,
-            Theme = "Blood Red",
-        })
+    local Window = VindUI:CreateWindow({
+        Title      = "Wisnu Hub",
+        Subtitle   = "Violence District",
+        Icon       = "Lucide:swords",
+        Size       = UDim2.fromOffset(580, 440),
+        MinSize    = Vector2.new(480, 380),
+        Draggable  = true,
+        Resizable  = true,
+        UseBlur    = false,
+        DefaultTab = "Home",
+    })
+
+    local function mkSec(tab, name, icon)
+        local ok, st = pcall(function()
+            return tab:AddSubTab({ Name = name, Icon = icon or "Lucide:circle" })
+        end)
+        return ok and st or tab
     end
 
-    local tabSurv   = Window:AddTab({ Title = "Survivor",     Icon = "solar/user-bold" })
-    local tabESP    = Window:AddTab({ Title = "ESP",          Icon = "solar/eye-bold" })
-    local tabKiller = Window:AddTab({ Title = "Killer",       Icon = "solar/swords-bold" })
-    local tabAim    = Window:AddTab({ Title = "Aim",          Icon = "solar/crosshair-bold" })
-    local tabMisc   = Window:AddTab({ Title = "Misc",         Icon = "solar/widget-bold" })
-    local tabUI     = Window:AddTab({ Title = "UI Settings",  Icon = "solar/settings-bold" })
+    local tabHome   = Window:AddTab({ Name = "Home",      Icon = "Lucide:layout-dashboard" })
+    local tabSurv   = Window:AddTab({ Name = "Survivor",  Icon = "Lucide:user" })
+    local tabESP    = Window:AddTab({ Name = "ESP",       Icon = "Lucide:eye" })
+    local tabKiller = Window:AddTab({ Name = "Killer",    Icon = "Lucide:sword" })
+    local tabAim    = Window:AddTab({ Name = "Aim",       Icon = "Lucide:crosshair" })
+    local tabMisc   = Window:AddTab({ Name = "Misc",      Icon = "Lucide:layers" })
+    local tabUI     = Window:AddTab({ Name = "Settings",  Icon = "Lucide:settings" })
+
+    -- HOME TAB
+    local homeInfo = mkSec(tabHome, "System Info", "Lucide:monitor")
+    homeInfo:AddCard({
+        UserId      = LocalPlayer.UserId,
+        Title       = LocalPlayer.DisplayName,
+        Description = "Violence District | Wisnu Hub",
+    })
+    homeInfo:AddSystemInfoGrid({ Description = "Live FPS, Ping & Executor" })
+    local homeMusic = mkSec(tabHome, "Music", "Lucide:music-2")
+    Window:AddSpotifyPanel({
+        Title      = "Spotify Remote",
+        Icon       = "Lucide:music-2",
+        EmbedMode  = true,
+        AutoConnect = false,
+    })
 
     -- ============================================================
     -- UI SURVIVOR
     -- ============================================================
-    local secSkill = tabSurv:AddSection("Skill Check", "solar/check-circle-bold")
-    secSkill:AddToggle("SkillCheck", {
-        Title = "Auto Skill Check",
+    local secSkill = mkSec(tabSurv, "Skill Check")
+    secSkill:AddToggle({ 
+        Text = "Auto Skill Check",
         Default = VD.AutoSkillcheck,
         Callback = function(v) 
             VD.AutoSkillcheck = v
             if v then startSkillCheck() else if ConnectionsSkill.SkillHeartbeat then ConnectionsSkill.SkillHeartbeat:Disconnect() end end
-        end
+        end,
+        Flag = "SkillCheck",
     })
-    secSkill:AddDropdown("SkillCheckMode", {
-        Title = "Mode",
-        Values = {"Legit", "Instant"},
+    secSkill:AddDropdown({ 
+        Text = "Mode",
+        Options = {"Legit", "Instant"},
         Default = VD.AutoSkillcheckMode,
-        Callback = function(v) VD.AutoSkillcheckMode = v end
+        Callback = function(v) VD.AutoSkillcheckMode = v end,
+        Flag = "SkillCheckMode",
     })
 
-    local secParry = tabSurv:AddSection("Parry", "solar/shield-star-bold")
-    secParry:AddToggle("Parry_Enable", {
-        Title = "Auto Parry",
+    local secParry = mkSec(tabSurv, "Parry")
+    secParry:AddToggle({ 
+        Text = "Auto Parry",
         Default = VD.Surv_AutoParry,
-        Callback = function(v) VD.Surv_AutoParry = v end
+        Callback = function(v) VD.Surv_AutoParry = v end,
+        Flag = "Parry_Enable",
     })
-    secParry:AddSlider("Parry_Range", {
-        Title = "Parry Range",
-        Min = 5, Max = 30, Default = VD.Surv_ParryRange, Rounding = 1,
-        Callback = function(v) VD.Surv_ParryRange = v end
+    secParry:AddSlider({ 
+        Text = "Parry Range",
+        Min = 5, Max = 30, Default = VD.Surv_ParryRange, Increment = 1,
+        Callback = function(v) VD.Surv_ParryRange = v end,
+        Flag = "Parry_Range",
     })
-    secParry:AddToggle("Parry_Safety", {
-        Title = "Safety Mode",
+    secParry:AddToggle({ 
+        Text = "Safety Mode",
         Default = VD.Surv_ParrySafety,
-        Callback = function(v) VD.Surv_ParrySafety = v end
+        Callback = function(v) VD.Surv_ParrySafety = v end,
+        Flag = "Parry_Safety",
     })
-    secParry:AddToggle("Parry_Aggressive", {
-        Title = "Aggressive",
+    secParry:AddToggle({ 
+        Text = "Aggressive",
         Default = VD.Surv_ParryAggressive,
-        Callback = function(v) VD.Surv_ParryAggressive = v end
+        Callback = function(v) VD.Surv_ParryAggressive = v end,
+        Flag = "Parry_Aggressive",
     })
-    secParry:AddSlider("Parry_Face", {
-        Title = "Face Threshold (0-1)",
-        Min = 0, Max = 1, Default = VD.Surv_ParryFace, Rounding = 0.1,
-        Callback = function(v) VD.Surv_ParryFace = v end
+    secParry:AddSlider({ 
+        Text = "Face Threshold (0-1)",
+        Min = 0, Max = 1, Default = VD.Surv_ParryFace, Increment = 0.1,
+        Callback = function(v) VD.Surv_ParryFace = v end,
+        Flag = "Parry_Face",
     })
 
-    local secPredict = tabSurv:AddSection("Killer Prediction (Spectator)", "solar/eye")
-    secPredict:AddToggle("KillerPredict_Enable", {
-        Title = "Enable Killer Prediction",
+    local secPredict = mkSec(tabSurv, "Killer Prediction (Spectator)")
+    secPredict:AddToggle({ 
+        Text = "Enable Killer Prediction",
         Default = VD.KillerPredict_Enabled,
         Tooltip = "Prediksi siapa yang akan jadi Killer berikutnya (hanya untuk Spectator)",
         Callback = function(v)
@@ -2722,61 +2763,70 @@ Onyx.Callbacks.OnSuccess = function()
                 KillerPredictionLabel:Destroy()
                 KillerPredictionLabel = nil
             end
-        end
+        end,
+        Flag = "KillerPredict_Enable",
     })
-    secPredict:AddSlider("KillerPredict_Interval", {
-        Title = "Update Interval (detik)",
-        Min = 1, Max = 10, Default = VD.KillerPredict_Interval, Rounding = 0,
+    secPredict:AddSlider({ 
+        Text = "Update Interval (detik)",
+        Min = 1, Max = 10, Default = VD.KillerPredict_Interval, Increment = 0,
         Callback = function(v)
             VD.KillerPredict_Interval = v
             KillerPredictionInterval = v
-        end
+        end,
+        Flag = "KillerPredict_Interval",
     })
 
-    local secFOV = tabSurv:AddSection("Camera FOV", "solar/camera")
-    secFOV:AddToggle("CustomFOV", {
-        Title = "Enable Custom FOV",
+    local secFOV = mkSec(tabSurv, "Camera FOV")
+    secFOV:AddToggle({ 
+        Text = "Enable Custom FOV",
         Default = VD.CustomFOV,
-        Callback = function(v) VD.CustomFOV = v end
+        Callback = function(v) VD.CustomFOV = v end,
+        Flag = "CustomFOV",
     })
-    secFOV:AddSlider("FOVValue", {
-        Title = "FOV Value",
-        Min = 70, Max = 120, Default = VD.FOVValue, Rounding = 1,
-        Callback = function(v) VD.FOVValue = v end
+    secFOV:AddSlider({ 
+        Text = "FOV Value",
+        Min = 70, Max = 120, Default = VD.FOVValue, Increment = 1,
+        Callback = function(v) VD.FOVValue = v end,
+        Flag = "FOVValue",
     })
 
-    local secMiscSurv = tabSurv:AddSection("Misc Survivor", "solar/running-bold")
-    secMiscSurv:AddToggle("AutoCrouch", {
-        Title = "Auto Crouch (Abyssal S1)",
+    local secMiscSurv = mkSec(tabSurv, "Misc Survivor")
+    secMiscSurv:AddToggle({ 
+        Text = "Auto Crouch (Abyssal S1)",
         Default = VD.Surv_AutoCrouch,
-        Callback = function(v) VD.Surv_AutoCrouch = v end
+        Callback = function(v) VD.Surv_AutoCrouch = v end,
+        Flag = "AutoCrouch",
     })
-    secMiscSurv:AddToggle("AutoDropPallet", {
-        Title = "Auto Drop Pallet",
+    secMiscSurv:AddToggle({ 
+        Text = "Auto Drop Pallet",
         Default = VD.Surv_AutoDropPallet,
-        Callback = function(v) VD.Surv_AutoDropPallet = v end
+        Callback = function(v) VD.Surv_AutoDropPallet = v end,
+        Flag = "AutoDropPallet",
     })
-    secMiscSurv:AddSlider("AutoDropPalletDist", {
-        Title = "Drop Distance",
-        Min = 2, Max = 15, Default = VD.Surv_AutoDropPalletDist, Rounding = 1,
-        Callback = function(v) VD.Surv_AutoDropPalletDist = v end
+    secMiscSurv:AddSlider({ 
+        Text = "Drop Distance",
+        Min = 2, Max = 15, Default = VD.Surv_AutoDropPalletDist, Increment = 1,
+        Callback = function(v) VD.Surv_AutoDropPalletDist = v end,
+        Flag = "AutoDropPalletDist",
     })
-    secMiscSurv:AddToggle("AntiKnock", {
-        Title = "Anti Knock",
+    secMiscSurv:AddToggle({ 
+        Text = "Anti Knock",
         Default = VD.Surv_AntiKnock,
-        Callback = function(v) VD.Surv_AntiKnock = v end
+        Callback = function(v) VD.Surv_AntiKnock = v end,
+        Flag = "AntiKnock",
     })
-    secMiscSurv:AddToggle("UnlimitedVault", {
-        Title = "Unlimited Vault",
+    secMiscSurv:AddToggle({ 
+        Text = "Unlimited Vault",
         Default = VD.UnlimitedVault,
         Tooltip = "Vault/lompat jendela tanpa cooldown",
         Callback = function(v)
             VD.UnlimitedVault = v
             if v then EnableUnlimitedVault() else DisableUnlimitedVault() end
-        end
+        end,
+        Flag = "UnlimitedVault",
     })
-    secMiscSurv:AddToggle("GenBypassToggle", {
-        Title = "Gen Bypass (Boost Repair)",
+    secMiscSurv:AddToggle({ 
+        Text = "Gen Bypass (Boost Repair)",
         Default = VD.GenBypass_Enabled,
         Tooltip = "Memperbaiki generator dengan cepat. Aktifkan tombol BYPASS di layar (touch) atau tekan G (PC).",
         Callback = function(v)
@@ -2787,10 +2837,11 @@ Onyx.Callbacks.OnSuccess = function()
             else
                 Notify("Gen Bypass", "Nonaktif", "info", 2)
             end
-        end
+        end,
+        Flag = "GenBypassToggle",
     })
-    secMiscSurv:AddToggle("Moonwalk_Enable", {
-        Title = "🌙 Moonwalk (WisnuVip)",
+    secMiscSurv:AddToggle({ 
+        Text = "🌙 Moonwalk (WisnuVip)",
         Default = VD.Moonwalk_Enabled,
         Tooltip = "Gerakan samping-mundur halus. Tekan G untuk toggle (PC) – GUI muncul di layar.",
         Callback = function(v)
@@ -2817,7 +2868,9 @@ Onyx.Callbacks.OnSuccess = function()
                             glow.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
                             glow.BackgroundTransparency = 0.85
                             if speedFill then
-                                TweenService:Create(speedFill, TweenInfo.new(0.3), {Size = UDim2.fromScale(1, 1)}):Play()
+                                TweenService:Create(speedFill, TweenInfo.new(0.3), {Size = UDim2.fromScale(1, 1),
+        Flag = "Moonwalk_Enable",
+    }):Play()
                             end
                         else
                             toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 130)
@@ -2839,56 +2892,66 @@ Onyx.Callbacks.OnSuccess = function()
     -- ============================================================
     -- UI ESP
     -- ============================================================
-    local secESP = tabESP:AddSection("ESP Settings", "solar/eye-bold")
-    secESP:AddToggle("ESP_Main", {
-        Title = "Enable ESP",
+    local secESP = mkSec(tabESP, "ESP Settings")
+    secESP:AddToggle({ 
+        Text = "Enable ESP",
         Default = VD.ESP_Enabled,
-        Callback = function(v) VD.ESP_Enabled = v; updateESP() end
+        Callback = function(v) VD.ESP_Enabled = v; updateESP() end,
+        Flag = "ESP_Main",
     })
-    secESP:AddToggle("ESP_Survivor", {
-        Title = "Survivor (Hijau)",
+    secESP:AddToggle({ 
+        Text = "Survivor (Hijau)",
         Default = VD.ESP_Survivor,
-        Callback = function(v) VD.ESP_Survivor = v; updateESP() end
+        Callback = function(v) VD.ESP_Survivor = v; updateESP() end,
+        Flag = "ESP_Survivor",
     })
-    secESP:AddToggle("ESP_Killer", {
-        Title = "Killer (Merah)",
+    secESP:AddToggle({ 
+        Text = "Killer (Merah)",
         Default = VD.ESP_Killer,
-        Callback = function(v) VD.ESP_Killer = v; updateESP() end
+        Callback = function(v) VD.ESP_Killer = v; updateESP() end,
+        Flag = "ESP_Killer",
     })
-    secESP:AddToggle("ESP_Generator", {
-        Title = "Generator (Ungu)",
+    secESP:AddToggle({ 
+        Text = "Generator (Ungu)",
         Default = VD.ESP_Generator,
-        Callback = function(v) VD.ESP_Generator = v; updateESP() end
+        Callback = function(v) VD.ESP_Generator = v; updateESP() end,
+        Flag = "ESP_Generator",
     })
-    secESP:AddToggle("ESP_Pallet", {
-        Title = "Pallet (Biru Muda)",
+    secESP:AddToggle({ 
+        Text = "Pallet (Biru Muda)",
         Default = VD.ESP_Pallet,
-        Callback = function(v) VD.ESP_Pallet = v; updateESP() end
+        Callback = function(v) VD.ESP_Pallet = v; updateESP() end,
+        Flag = "ESP_Pallet",
     })
-    secESP:AddToggle("ESP_Window", {
-        Title = "Window (Kuning)",
+    secESP:AddToggle({ 
+        Text = "Window (Kuning)",
         Default = VD.ESP_Window,
-        Callback = function(v) VD.ESP_Window = v; updateESP() end
+        Callback = function(v) VD.ESP_Window = v; updateESP() end,
+        Flag = "ESP_Window",
     })
-    secESP:AddToggle("ESP_SCP", {
-        Title = "SCP (Orange)",
+    secESP:AddToggle({ 
+        Text = "SCP (Orange)",
         Default = VD.ESP_SCP,
-        Callback = function(v) VD.ESP_SCP = v; updateESP() end
+        Callback = function(v) VD.ESP_SCP = v; updateESP() end,
+        Flag = "ESP_SCP",
     })
-    secESP:AddToggle("ESP_Gate", {
-        Title = "Gate (Putih)",
+    secESP:AddToggle({ 
+        Text = "Gate (Putih)",
         Default = VD.ESP_Gate,
-        Callback = function(v) VD.ESP_Gate = v; updateESP() end
+        Callback = function(v) VD.ESP_Gate = v; updateESP() end,
+        Flag = "ESP_Gate",
     })
-    secESP:AddToggle("ESP_ShowItem", {
-        Title = "Show Item Icon",
+    secESP:AddToggle({ 
+        Text = "Show Item Icon",
         Default = VD.ESP_ShowItem,
-        Callback = function(v) VD.ESP_ShowItem = v; updateESP() end
+        Callback = function(v) VD.ESP_ShowItem = v; updateESP() end,
+        Flag = "ESP_ShowItem",
     })
-    secESP:AddSlider("ESP_Distance", {
-        Title = "Max Distance",
-        Min = 20, Max = 10000, Default = VD.ESP_Distance, Rounding = 0,
-        Callback = function(v) VD.ESP_Distance = v; updateESP() end
+    secESP:AddSlider({ 
+        Text = "Max Distance",
+        Min = 20, Max = 10000, Default = VD.ESP_Distance, Increment = 0,
+        Callback = function(v) VD.ESP_Distance = v; updateESP() end,
+        Flag = "ESP_Distance",
     })
     secESP:AddButton({
         Text = "Refresh ESP",
@@ -2896,79 +2959,89 @@ Onyx.Callbacks.OnSuccess = function()
         Callback = function() updateESP(); Notify("ESP", "Refreshed", "success", 2) end
     })
 
-    local secVisual = tabESP:AddSection("Visual Settings", "solar/sun-bold")
-    secVisual:AddToggle("NoShadow", {
-        Title = "No Shadow",
+    local secVisual = mkSec(tabESP, "Visual Settings")
+    secVisual:AddToggle({ 
+        Text = "No Shadow",
         Default = VD.NoShadow,
-        Callback = function(v) VD.NoShadow = v; applyVisualSettings() end
+        Callback = function(v) VD.NoShadow = v; applyVisualSettings() end,
+        Flag = "NoShadow",
     })
-    secVisual:AddToggle("LowGraphics", {
-        Title = "Low Graphics",
+    secVisual:AddToggle({ 
+        Text = "Low Graphics",
         Default = VD.LowGraphics,
-        Callback = function(v) VD.LowGraphics = v; applyVisualSettings() end
+        Callback = function(v) VD.LowGraphics = v; applyVisualSettings() end,
+        Flag = "LowGraphics",
     })
-    secVisual:AddToggle("Fullbright", {
-        Title = "Fullbright",
+    secVisual:AddToggle({ 
+        Text = "Fullbright",
         Default = VD.Fullbright,
-        Callback = function(v) VD.Fullbright = v; applyVisualSettings() end
+        Callback = function(v) VD.Fullbright = v; applyVisualSettings() end,
+        Flag = "Fullbright",
     })
-    secVisual:AddToggle("NoFog", {
-        Title = "No Fog",
+    secVisual:AddToggle({ 
+        Text = "No Fog",
         Default = VD.NoFog,
-        Callback = function(v) VD.NoFog = v; applyVisualSettings() end
+        Callback = function(v) VD.NoFog = v; applyVisualSettings() end,
+        Flag = "NoFog",
     })
 
     -- ============================================================
     -- UI KILLER
     -- ============================================================
-    local secKiller = tabKiller:AddSection("Killer Features", "solar/swords-bold")
-    secKiller:AddToggle("UnlockSkillsCarry", {
-        Title = "Unlock Skills While Carrying",
+    local secKiller = mkSec(tabKiller, "Killer Features")
+    secKiller:AddToggle({ 
+        Text = "Unlock Skills While Carrying",
         Default = VD.UnlockSkillsCarry,
         Tooltip = "Memungkinkan menggunakan skill saat menggendong survivor",
         Callback = function(v)
             VD.UnlockSkillsCarry = v
             if v then SetupUnlockSkillsCarry() end
-        end
+        end,
+        Flag = "UnlockSkillsCarry",
     })
-    secKiller:AddToggle("AutoStalk", {
-        Title = "Auto Stalk (Myers)",
+    secKiller:AddToggle({ 
+        Text = "Auto Stalk (Myers)",
         Default = VD.AutoStalk,
         Tooltip = "Otomatis stalk survivor terdekat",
         Callback = function(v)
             VD.AutoStalk = v
             if v then StartAutoStalk() else StopAutoStalk() end
-        end
+        end,
+        Flag = "AutoStalk",
     })
     secKiller:AddParagraph({ Title = "Spear Aim Settings", Text = "" })
-    secKiller:AddSlider("SpearGravity", {
-        Title = "Spear Gravity",
-        Min = 10, Max = 200, Default = VD.SpearGravity, Rounding = 0,
-        Callback = function(v) VD.SpearGravity = v end
+    secKiller:AddSlider({ 
+        Text = "Spear Gravity",
+        Min = 10, Max = 200, Default = VD.SpearGravity, Increment = 0,
+        Callback = function(v) VD.SpearGravity = v end,
+        Flag = "SpearGravity",
     })
-    secKiller:AddSlider("SpearSpeed", {
-        Title = "Spear Speed",
-        Min = 20, Max = 300, Default = VD.SpearSpeed, Rounding = 0,
-        Callback = function(v) VD.SpearSpeed = v end
+    secKiller:AddSlider({ 
+        Text = "Spear Speed",
+        Min = 20, Max = 300, Default = VD.SpearSpeed, Increment = 0,
+        Callback = function(v) VD.SpearSpeed = v end,
+        Flag = "SpearSpeed",
     })
-    secKiller:AddDropdown("AttackAimMode", {
-        Title = "Aimlock Mode",
-        Values = {"Normal", "Spear"},
+    secKiller:AddDropdown({ 
+        Text = "Aimlock Mode",
+        Options = {"Normal", "Spear"},
         Default = AttackAimMode,
-        Callback = function(v) AttackAimMode = v end
+        Callback = function(v) AttackAimMode = v end,
+        Flag = "AttackAimMode",
     })
 
     secKiller:AddParagraph({ Title = "Veil Silent Aim", Text = "" })
-    secKiller:AddToggle("SA_Veil", {
-        Title = "Silent Aim (Veil)",
+    secKiller:AddToggle({ 
+        Text = "Silent Aim (Veil)",
         Default = VD.Veil_SilentAim,
         Tooltip = "Otomatis target killer saat menggunakan Veil",
-        Callback = function(v) VD.Veil_SilentAim = v end
+        Callback = function(v) VD.Veil_SilentAim = v end,
+        Flag = "SA_Veil",
     })
 
-    local secDouble = tabKiller:AddSection("Double Damage Generator", "solar/bomb")
-    secDouble:AddToggle("DoubleDamage", {
-        Title = "Double Damage Generator",
+    local secDouble = mkSec(tabKiller, "Double Damage Generator")
+    secDouble:AddToggle({ 
+        Text = "Double Damage Generator",
         Default = VD.DoubleDamageGen,
         Tooltip = "Saat menendang generator (BreakGenEvent), remote akan dikirim beberapa kali untuk damage berlipat.",
         Callback = function(v)
@@ -2979,12 +3052,13 @@ Onyx.Callbacks.OnSuccess = function()
             else
                 Notify("Double Damage", "Nonaktif", "info", 2)
             end
-        end
+        end,
+        Flag = "DoubleDamage",
     })
 
-    local secHitbox = tabKiller:AddSection("Hitbox Expander", "solar/expand")
-    secHitbox:AddToggle("HitboxExpander", {
-        Title = "Killer Hitbox",
+    local secHitbox = mkSec(tabKiller, "Hitbox Expander")
+    secHitbox:AddToggle({ 
+        Text = "Killer Hitbox",
         Default = VD.HitboxExpander,
         Tooltip = "Perbesar hitbox HumanoidRootPart semua killer (agar lebih mudah dipukul / dideteksi)",
         Callback = function(v)
@@ -3004,130 +3078,147 @@ Onyx.Callbacks.OnSuccess = function()
                 end
             end
             Notify("Hitbox Expander", v and "ON – Size: "..tostring(VD.HitboxSize) or "OFF", "info", 2)
-        end
+        end,
+        Flag = "HitboxExpander",
     })
-    secHitbox:AddSlider("HitboxSize", {
-        Title = "Hitbox Size",
-        Min = 2, Max = 50, Default = VD.HitboxSize, Rounding = 0,
-        Callback = function(v) VD.HitboxSize = v end
+    secHitbox:AddSlider({ 
+        Text = "Hitbox Size",
+        Min = 2, Max = 50, Default = VD.HitboxSize, Increment = 0,
+        Callback = function(v) VD.HitboxSize = v end,
+        Flag = "HitboxSize",
     })
 
-    local secMask = tabKiller:AddSection("Mask Selection", "solar/mask")
-    secMask:AddToggle("MaskSelection_Enable", {
-        Title = "Mask Selection GUI",
+    local secMask = mkSec(tabKiller, "Mask Selection")
+    secMask:AddToggle({ 
+        Text = "Mask Selection GUI",
         Default = VD.MaskSelection_Enabled,
         Tooltip = "Tampilkan GUI pemilihan mask (untuk The Masked) – tekan M untuk minimize, angka 1-6 untuk mask, 7 untuk deaktivasi.",
         Callback = function(v)
             VD.MaskSelection_Enabled = v
             if v then ShowMaskGui() else HideMaskGui() end
-        end
+        end,
+        Flag = "MaskSelection_Enable",
     })
 
     -- ============================================================
     -- UI AIM (Pistol + Flash, tanpa Veil)
     -- ============================================================
-    local secPistol = tabAim:AddSection("🔫 Pistol Silent Aim", "solar/crosshair-bold")
-    secPistol:AddToggle("SA_Pistol", {
-        Title = "Silent Aim (Pistol)",
+    local secPistol = mkSec(tabAim, "🔫 Pistol Silent Aim")
+    secPistol:AddToggle({ 
+        Text = "Silent Aim (Pistol)",
         Default = VD.Pistol_SilentAim,
         Callback = function(v) 
             VD.Pistol_SilentAim = v
-        end
+        end,
+        Flag = "SA_Pistol",
     })
-    secPistol:AddToggle("SA_BlockKnocked", {
-        Title = "Block when Knocked",
+    secPistol:AddToggle({ 
+        Text = "Block when Knocked",
         Default = VD.Pistol_BlockKnocked,
-        Callback = function(v) VD.Pistol_BlockKnocked = v end
+        Callback = function(v) VD.Pistol_BlockKnocked = v end,
+        Flag = "SA_BlockKnocked",
     })
-    secPistol:AddToggle("SA_LockAim", {
-        Title = "Lock Aim",
+    secPistol:AddToggle({ 
+        Text = "Lock Aim",
         Default = VD.Pistol_LockAim,
-        Callback = function(v) VD.Pistol_LockAim = v end
+        Callback = function(v) VD.Pistol_LockAim = v end,
+        Flag = "SA_LockAim",
     })
-    secPistol:AddToggle("SA_FOVMode", {
-        Title = "FOV Mode",
+    secPistol:AddToggle({ 
+        Text = "FOV Mode",
         Default = VD.Pistol_FOVMode,
-        Callback = function(v) VD.Pistol_FOVMode = v end
+        Callback = function(v) VD.Pistol_FOVMode = v end,
+        Flag = "SA_FOVMode",
     })
-    secPistol:AddToggle("SA_ShowFOV", {
-        Title = "Show FOV Circle",
+    secPistol:AddToggle({ 
+        Text = "Show FOV Circle",
         Default = VD.Pistol_ShowFOV,
-        Callback = function(v) VD.Pistol_ShowFOV = v end
+        Callback = function(v) VD.Pistol_ShowFOV = v end,
+        Flag = "SA_ShowFOV",
     })
-    secPistol:AddSlider("SA_FOV", {
-        Title = "FOV Radius",
-        Min = 30, Max = 500, Default = VD.Pistol_FOV, Rounding = 5,
-        Callback = function(v) VD.Pistol_FOV = v end
+    secPistol:AddSlider({ 
+        Text = "FOV Radius",
+        Min = 30, Max = 500, Default = VD.Pistol_FOV, Increment = 5,
+        Callback = function(v) VD.Pistol_FOV = v end,
+        Flag = "SA_FOV",
     })
-    secPistol:AddDropdown("SA_Target", {
-        Title = "Target",
-        Values = {"Killer", "Survivor", "SCP"},
+    secPistol:AddDropdown({ 
+        Text = "Target",
+        Options = {"Killer", "Survivor", "SCP"},
         Default = VD.Pistol_Target,
         Callback = function(v) 
             VD.Pistol_Target = v[1]
-        end
+        end,
+        Flag = "SA_Target",
     })
-    secPistol:AddDropdown("SA_TargetPart", {
-        Title = "Target Part",
-        Values = {"Torso", "Head", "Root"},
+    secPistol:AddDropdown({ 
+        Text = "Target Part",
+        Options = {"Torso", "Head", "Root"},
         Default = VD.Pistol_TargetPart,
-        Callback = function(v) VD.Pistol_TargetPart = v end
+        Callback = function(v) VD.Pistol_TargetPart = v end,
+        Flag = "SA_TargetPart",
     })
-    secPistol:AddToggle("SA_HideLaser", {
-        Title = "Hide Laser",
+    secPistol:AddToggle({ 
+        Text = "Hide Laser",
         Default = VD.Pistol_HideLaser,
         Callback = function(v) 
             VD.Pistol_HideLaser = v
             if pistolLaser then pistolLaser.Transparency = v and 1 or 0 end
-        end
+        end,
+        Flag = "SA_HideLaser",
     })
 
-    local secFlash = tabAim:AddSection("🔦 Flashlight Silent Aim", "solar/flashlight-bold")
-    secFlash:AddToggle("SA_Flash", {
-        Title = "Silent Aim (Flashlight)",
+    local secFlash = mkSec(tabAim, "🔦 Flashlight Silent Aim")
+    secFlash:AddToggle({ 
+        Text = "Silent Aim (Flashlight)",
         Default = VD.Flash_SilentAim,
-        Callback = function(v) VD.Flash_SilentAim = v end
+        Callback = function(v) VD.Flash_SilentAim = v end,
+        Flag = "SA_Flash",
     })
-    secFlash:AddSlider("SA_FlashYOffset", {
-        Title = "Flash Y Offset",
-        Min = -5, Max = 20, Default = VD.Flash_YOffset, Rounding = 0.5,
-        Callback = function(v) VD.Flash_YOffset = v end
+    secFlash:AddSlider({ 
+        Text = "Flash Y Offset",
+        Min = -5, Max = 20, Default = VD.Flash_YOffset, Increment = 0.5,
+        Callback = function(v) VD.Flash_YOffset = v end,
+        Flag = "SA_FlashYOffset",
     })
 
     -- ============================================================
     -- UI MISC
     -- ============================================================
-    local secMisc = tabMisc:AddSection("Performance & Display", "solar/widget-bold")
-    secMisc:AddToggle("ShowFPS", {
-        Title = "Show FPS Counter",
+    local secMisc = mkSec(tabMisc, "Performance & Display")
+    secMisc:AddToggle({ 
+        Text = "Show FPS Counter",
         Default = VD.ShowFPS,
         Callback = function(v)
             VD.ShowFPS = v
             if not FPSFrame then createCounter() end
             updateCounterVisibility()
             if not v then fpsCount = 0; fpsTime = 0 end
-        end
+        end,
+        Flag = "ShowFPS",
     })
-    secMisc:AddToggle("ShowPing", {
-        Title = "Show Ping Counter",
+    secMisc:AddToggle({ 
+        Text = "Show Ping Counter",
         Default = VD.ShowPing,
         Callback = function(v)
             VD.ShowPing = v
             if not FPSFrame then createCounter() end
             updateCounterVisibility()
-        end
+        end,
+        Flag = "ShowPing",
     })
-    secMisc:AddToggle("ReduceMap", {
-        Title = "Reduce Map (Hapus Partikel)",
+    secMisc:AddToggle({ 
+        Text = "Reduce Map (Hapus Partikel)",
         Default = VD.ReduceMap,
         Tooltip = "Menghapus partikel & dekorasi untuk meningkatkan performa",
         Callback = function(v)
             VD.ReduceMap = v
             applyVisualSettings()
-        end
+        end,
+        Flag = "ReduceMap",
     })
-    secMisc:AddToggle("RemoveVisualEffects", {
-        Title = "Remove Visual Effects",
+    secMisc:AddToggle({ 
+        Text = "Remove Visual Effects",
         Default = VD.RemoveVisualEffects,
         Tooltip = "Hapus semua efek visual (bloom, DOF, atmosfer, kabut, dll.)",
         Callback = function(v)
@@ -3138,7 +3229,8 @@ Onyx.Callbacks.OnSuccess = function()
             else
                 Notify("Visual Effects", "Efek dipulihkan", "info", 2)
             end
-        end
+        end,
+        Flag = "RemoveVisualEffects",
     })
 
     -- ============================================================
