@@ -3631,11 +3631,16 @@ Onyx.Callbacks.OnSuccess = function()
         local _uiOpen = true
         btn.MouseButton1Click:Connect(function()
             _uiOpen = not _uiOpen
-            if _uiOpen then
-                pcall(function() Window:Show() end)
-            else
-                pcall(function() Window:Hide() end)
-            end
+            pcall(function()
+                -- VVind-UI: coba Toggle, fallback ke ScreenGui Enabled
+                if Window.Toggle then
+                    Window:Toggle()
+                elseif Window.ScreenGui then
+                    Window.ScreenGui.Enabled = _uiOpen
+                elseif Window.Root then
+                    Window.Root.Enabled = _uiOpen
+                end
+            end)
         end)
     end
     createFloatingButton()
