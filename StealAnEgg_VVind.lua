@@ -5,31 +5,8 @@
 --  Author: AlDev14
 -- ============================================================
 
--- AC Bypass (filtergc + metatable freeze)
-local function bypassClientDetections()
-    if typeof(filtergc) ~= "function" or typeof(debug) ~= "table" or typeof(debug.getupvalues) ~= "function" then
-        return false, "no filtergc"
-    end
-    local ok, fn = pcall(function()
-        return filtergc("function", { Constants = { "gmatch", "GetFullName" } }, true)
-    end)
-    if not ok or type(fn) ~= "function" then return false, "filter miss" end
-    local setMeta = (typeof(setrawmetatable) == "function" and setrawmetatable)
-        or (typeof(setmetatable) == "function" and setmetatable)
-    if not setMeta then return false, "no setmeta" end
-    local blocked = 0
-    local okUv, ups = pcall(debug.getupvalues, fn)
-    if not okUv or type(ups) ~= "table" then return false, "no upvalues" end
-    for _, tbl in pairs(ups) do
-        if typeof(tbl) == "table" then
-            local okSet = pcall(setMeta, tbl, { __newindex = function() end })
-            if okSet then blocked += 1 end
-        end
-    end
-    return blocked > 0, blocked
-end
-local acOk, acInfo = bypassClientDetections()
-print("[SAE] AC bypass:", acOk, acInfo)
+-- AC Bypass removed — memanggil filtergc/debug bisa justru trigger AC
+-- Biarkan game scan berjalan normal
 
 -- Load VVind-UI
 local VindUI
@@ -104,8 +81,8 @@ local function loadModules()
         if Client then
             EggCmds  = soft(Client:FindFirstChild("EggCmds"))
             PlotCmds = soft(Client:FindFirstChild("PlotCmds"))
-            Guard    = soft(Client:FindFirstChild("ToolGameplayGuard"))
-                or soft(Client:FindFirstChild("GameplayGuard"))
+            -- Guard tidak di-require — bisa trigger internal check
+    -- Guard    = soft(Client:FindFirstChild("ToolGameplayGuard"))
         end
         if Util then
             Lookup = soft(Util:FindFirstChild("GuardAreaLookupUtil"))
@@ -127,11 +104,7 @@ local function loadModules()
             if Plots then
                 PlotCmds = soft(Plots:FindFirstChild("PlotCmds"))
             end
-            -- Guard
-            local Controllers = Game and Game:FindFirstChild("Controllers")
-            if Controllers then
-                Guard = soft(Controllers:FindFirstChild("ToolGameplayGuard"))
-            end
+            -- Guard tidak di-require (bisa trigger internal AC)
         end
     end
 
@@ -208,7 +181,10 @@ local function walkTo(goal, timeout)
     -- Kalau sudah dekat, tidak perlu jalan
     if (r.Position - goal).Magnitude <= ARRIVE_DIST then return true end
 
-    -- Pakai MoveTo untuk navigasi (game handles movement)
+    -- Random delay kecil sebelum mulai jalan (natural behavior)
+    task.wait(math.random(10, 25) / 100)
+
+    -- Pakai MoveTo saja tanpa manual Move loop (lebih natural)
     h:MoveTo(goal)
 
     local t0 = workspace.DistributedGameTime
@@ -223,14 +199,7 @@ local function walkTo(goal, timeout)
             return true
         end
 
-        -- Re-direct setiap 0.15s agar tidak nyangkut
-        local flat = Vector3.new(goal.X - r.Position.X, 0, goal.Z - r.Position.Z)
-        if flat.Magnitude > 0.3 then
-            h = hum()
-            if h then h:Move(flat.Unit, false) end
-        end
-
-        task.wait(0.15)
+        task.wait(0.2)  -- poll lebih jarang, lebih natural
     end
 
     h = hum()
@@ -265,10 +234,11 @@ local function onGameplaySide(pos)
 end
 
 local function inGameplay()
-    if Guard and type(Guard.IsLocalPlayerInGameplayArea) == "function" then
-        return Guard.IsLocalPlayerInGameplayArea() == true
-    end
-    return false
+    -- Tidak pakai Guard module — cek posisi manual
+    local line = getSeparationLine()
+    local r = root()
+    if not line or not r then return false end
+    return onGameplaySide(r.Position)
 end
 
 local function crossToArena()
@@ -406,9 +376,10 @@ local function stealCycle()
         State.status = "Jalan ke telur"
         walkTo(pos, TRAVEL_SPEED)
 
-        -- 5. Simulate hold (0.6s) lalu fire carry
+        -- 5. Simulate hold dengan random jitter (lebih natural)
         State.status = "Hold egg..."
-        task.wait(HOLD_WAIT)
+        -- Random delay: simulate player reaction time
+        task.wait(HOLD_WAIT + math.random(-10, 20) / 100)
 
         -- Coba ProximityPrompt
         local prompt = findPromptNear(pos, uid)
