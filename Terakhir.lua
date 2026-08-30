@@ -2751,29 +2751,7 @@ Onyx.Callbacks.OnSuccess = function()
         Description = "Violence District | Wisnu Hub",
     })
     homeInfo:AddSystemInfoGrid({ Description = "Live FPS, Ping & Executor" })
-    local homeMusic = mkSec(tabHome, "Music", "Lucide:music-2")
-    homeMusic:AddParagraph({
-        Title = "Music Player",
-        Text  = "Play audio tracks below. Works on mobile.",
-    })
-    homeMusic:AddAudio({
-        Audio    = "rbxassetid://94574184618701",
-        Volume   = 0.5,
-        Looped   = true,
-        AutoPlay = false,
-        AudioTitle    = "Earrings",
-        AudioSubtitle = "By Malcolm Todd",
-        PlayOutsideWindow = true,
-    })
-    homeMusic:AddAudio({
-        Audio    = "rbxassetid://142376088",
-        Volume   = 0.5,
-        Looped   = true,
-        AutoPlay = false,
-        AudioTitle    = "Roblox Classic BGM",
-        AudioSubtitle = "By Roblox",
-        PlayOutsideWindow = false,
-    })
+
 
     -- ============================================================
     -- UI SURVIVOR
