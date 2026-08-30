@@ -8,6 +8,49 @@
 -- AC Bypass removed — memanggil filtergc/debug bisa justru trigger AC
 -- Biarkan game scan berjalan normal
 
+-- ============================================================
+-- HUMANOID CLONE BYPASS
+-- Harus dijalankan PERTAMA sebelum game modules load
+-- Reference AC ke Humanoid asli jadi invalid
+-- ============================================================
+local function doHumanoidBypass()
+    local char = LocalPlayer.Character
+    if not char then
+        char = LocalPlayer.CharacterAdded:Wait()
+    end
+    local origHum = char:FindFirstChildOfClass("Humanoid")
+        or char:WaitForChild("Humanoid", 10)
+    if not origHum then
+        print("[SAE] Bypass: Humanoid not found")
+        return
+    end
+    pcall(function()
+        local cloneHum = origHum:Clone()
+        -- Copy semua properties penting
+        cloneHum.WalkSpeed    = origHum.WalkSpeed
+        cloneHum.JumpPower    = origHum.JumpPower
+        cloneHum.MaxHealth    = origHum.MaxHealth
+        cloneHum.Health       = origHum.Health
+        cloneHum.AutoRotate   = origHum.AutoRotate
+        cloneHum.DisplayName  = origHum.DisplayName
+        -- Pasang clone dulu
+        cloneHum.Parent = char
+        task.wait(0.05)
+        -- Hapus yang asli
+        origHum:Destroy()
+        print("[SAE] Humanoid bypass OK")
+    end)
+end
+
+-- Jalankan bypass langsung
+doHumanoidBypass()
+
+-- Re-apply setiap respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.3)
+    doHumanoidBypass()
+end)
+
 -- Load VVind-UI
 local VindUI
 do
