@@ -581,7 +581,78 @@ Onyx.Callbacks.OnSuccess = function()
                         local dist = (part.Position - root.Position).Magnitude
                         if dist <= maxDist then
                             createHighlight(gate, COLORS.Gate)
-                            createBillboard(gate, "GATE", COLORS.Gate)
+
+                            -- Progress ESP: cek attribute hold dari server
+                            -- VD gate hold = 20 detik total
+                            local GATE_HOLD_TIME = 20
+                            local progressPct = 0
+                            local isOpen = false
+
+                            -- Coba baca attribute progress langsung
+                            local holdProgress = gate:GetAttribute("HoldProgress")
+                                or gate:GetAttribute("Progress")
+                                or gate:GetAttribute("OpenProgress")
+                                or gate:GetAttribute("GateProgress")
+
+                            if holdProgress then
+                                -- Kalau sudah dalam bentuk 0-1
+                                if holdProgress <= 1 then
+                                    progressPct = math.floor(holdProgress * 100)
+                                else
+                                    progressPct = math.floor(holdProgress)
+                                end
+                            end
+
+                            -- Cek apakah gate sudah terbuka
+                            local opened = gate:GetAttribute("IsOpen")
+                                or gate:GetAttribute("Opened")
+                                or gate:GetAttribute("GateOpen")
+                            if opened then
+                                isOpen = true
+                                progressPct = 100
+                            end
+
+                            -- Cek siapa yang hold (tracker per gate)
+                            if not _GateHoldTrackers then _GateHoldTrackers = {} end
+                            local tracker = _GateHoldTrackers[gate]
+
+                            -- Cek attribute IsHolding
+                            local isHolding = gate:GetAttribute("IsHolding")
+                                or gate:GetAttribute("BeingHeld")
+                                or gate:GetAttribute("HoldActive")
+
+                            if isHolding and not tracker then
+                                -- Mulai track waktu hold
+                                _GateHoldTrackers[gate] = workspace.DistributedGameTime
+                            elseif not isHolding and tracker then
+                                _GateHoldTrackers[gate] = nil
+                            end
+
+                            -- Kalau tidak ada attribute, pakai time-based tracking
+                            if holdProgress == nil and tracker then
+                                local elapsed = workspace.DistributedGameTime - tracker
+                                progressPct = math.floor(math.clamp(elapsed / GATE_HOLD_TIME * 100, 0, 100))
+                            end
+
+                            -- Build label
+                            local label
+                            if isOpen then
+                                label = "GATE [OPEN]"
+                            elseif progressPct > 0 then
+                                label = string.format("GATE [%d%%]", progressPct)
+                            else
+                                label = "GATE"
+                            end
+
+                            -- Warna: hijau makin dekat selesai
+                            local gateColor = COLORS.Gate
+                            if progressPct >= 80 then
+                                gateColor = Color3.fromRGB(0, 255, 100)
+                            elseif progressPct >= 40 then
+                                gateColor = Color3.fromRGB(255, 220, 0)
+                            end
+
+                            createBillboard(gate, label, gateColor)
                         end
                     end
                 end
