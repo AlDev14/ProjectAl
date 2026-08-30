@@ -2757,6 +2757,15 @@ Onyx.Callbacks.OnSuccess = function()
         Text  = "Play audio tracks below. Works on mobile.",
     })
     homeMusic:AddAudio({
+        Audio    = "rbxassetid://94574184618701",
+        Volume   = 0.5,
+        Looped   = true,
+        AutoPlay = false,
+        AudioTitle    = "Earrings",
+        AudioSubtitle = "By Malcolm Todd",
+        PlayOutsideWindow = true,
+    })
+    homeMusic:AddAudio({
         Audio    = "rbxassetid://142376088",
         Volume   = 0.5,
         Looped   = true,
@@ -2764,24 +2773,6 @@ Onyx.Callbacks.OnSuccess = function()
         AudioTitle    = "Roblox Classic BGM",
         AudioSubtitle = "By Roblox",
         PlayOutsideWindow = false,
-    })
-    homeMusic:AddAudio({
-        Audio    = "rbxassetid://1843493556",
-        Volume   = 0.5,
-        Looped   = true,
-        AutoPlay = false,
-        AudioTitle    = "Pigstep",
-        AudioSubtitle = "Minecraft OST",
-        PlayOutsideWindow = false,
-    })
-    homeMusic:AddAudio({
-        Audio    = "rbxassetid://1843493556",
-        Volume   = 0.4,
-        Looped   = true,
-        AutoPlay = false,
-        AudioTitle    = "Chill Lo-Fi",
-        AudioSubtitle = "Background Music",
-        PlayOutsideWindow = true,
     })
 
     -- ============================================================
