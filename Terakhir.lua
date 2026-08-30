@@ -1186,93 +1186,107 @@ Onyx.Callbacks.OnSuccess = function()
     local StateSkill = { busy = false }
     local ConnectionsSkill = {}
 
-    local function pressSpace()
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-        task.wait()
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-    end
+    local GuiService = game:GetService("GuiService")
+    local LastTriggerTick = 0
 
-    local function GetActionTarget()
-        local current = PlayerGui
-        for segment in string.gmatch(ActionPath, "[^%.]+") do
-            current = current and current:FindFirstChild(segment)
-        end
-        return current
-    end
+    -- Quantum: PressSkill — firesignal → VIM touch → Space
+    local function PressSkill()
+        if workspace.DistributedGameTime - LastTriggerTick < 0.08 then return end
+        LastTriggerTick = workspace.DistributedGameTime
 
-    local function TriggerMobileButton()
-        local btn = GetActionTarget()
-        local GuiService = game:GetService("GuiService")
-        -- Try firesignal first (most reliable)
+        local btn = PlayerGui:FindFirstChild("check", true)
         if btn and btn:IsA("GuiObject") and btn.Visible then
+            -- firesignal (most reliable on mobile)
             if type(firesignal) == "function" then
                 pcall(function()
-                    firesignal(btn.MouseButton1Down)
-                    task.wait(0.005)
-                    firesignal(btn.MouseButton1Up)
+                    firesignal(btn.MouseButton1Click)
                 end)
                 return
             end
-        end
-        -- Fallback: VIM touch with random TouchID
-        if btn and btn:IsA("GuiObject") and btn.Visible then
+            -- VIM touch fallback
             pcall(function()
                 local pos = btn.AbsolutePosition
                 local size = btn.AbsoluteSize
                 local inset = GuiService:GetGuiInset()
-                local tid = 8822 + math.random(1, 9999)
-                VirtualInputManager:SendTouchEvent(tid, 0, pos.X + size.X/2 + inset.X, pos.Y + size.Y/2 + inset.Y)
-                task.wait(0.005)
-                VirtualInputManager:SendTouchEvent(tid, 2, pos.X + size.X/2 + inset.X, pos.Y + size.Y/2 + inset.Y)
+                local x = pos.X + (size.X/2) + inset.X
+                local y = pos.Y + (size.Y/2) + inset.Y
+                VirtualInputManager:SendTouchEvent(8822, Enum.UserInputState.Begin.Value, x, y)
+                task.wait()
+                VirtualInputManager:SendTouchEvent(8822, Enum.UserInputState.End.Value, x, y)
             end)
             return
         end
-        -- Final fallback: Space key
+
+        -- PC fallback: Space key
         pcall(function()
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.005)
+            task.wait()
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
         end)
     end
+    -- alias untuk backward compat
+    local TriggerMobileButton = PressSkill
+
+    -- Quantum: GetSkillCheck — multi-GUI fallback scan
+    local function GetSkillCheck()
+        for _, guiName in ipairs({"SkillCheckPromptGui","SkillCheckPromptGui-con","SkillCheckGui","SkillCheck"}) do
+            local gui = PlayerGui:FindFirstChild(guiName, true)
+            if gui then
+                local check = gui:FindFirstChild("Check", true) or gui:FindFirstChild("SkillCheck", true) or gui
+                if check and (check.Visible == true or (check:IsA("GuiObject") and check.BackgroundTransparency < 1)) then
+                    local line = check:FindFirstChild("Line", true) or check:FindFirstChild("Needle", true) or check:FindFirstChild("Pointer", true)
+                    local goal = check:FindFirstChild("Goal", true) or check:FindFirstChild("Zone", true) or check:FindFirstChild("Bar", true)
+                    if line and goal then return line, goal end
+                end
+            end
+        end
+        -- Fallback: scan all descendants
+        for _, obj in ipairs(PlayerGui:GetDescendants()) do
+            if obj.Name == "Check" and obj:IsA("GuiObject") and obj.Visible then
+                local line = obj:FindFirstChild("Line", true)
+                local goal = obj:FindFirstChild("Goal", true)
+                if line and goal then return line, goal end
+            end
+        end
+        return nil, nil
+    end
+
+    local LastGoalRotation = 0
 
     local function startSkillCheck()
         if ConnectionsSkill.SkillHeartbeat then ConnectionsSkill.SkillHeartbeat:Disconnect() end
         ConnectionsSkill.SkillHeartbeat = RunService.RenderStepped:Connect(function()
             if not VD.AutoSkillcheck or StateSkill.busy then return end
-            
-            local prompt = PlayerGui:FindFirstChild("SkillCheckPromptGui")
-            if not prompt then return end
-            
-            local check = prompt:FindFirstChild("Check")
-            if not check or not check.Visible then return end
-            
-            local line = check:FindFirstChild("Line")
-            local goal = check:FindFirstChild("Goal")
-            if not line or not goal then return end
+            -- Quantum multi-GUI scan
+            local line, goal = GetSkillCheck()
+            if not (line and goal) then return end
+
+            local lr = (line.Rotation or 0) % 360
+            local gr = (goal.Rotation or 0) % 360
 
             if VD.AutoSkillcheckMode == "Instant" then
                 line.Rotation = goal.Rotation + 109
                 StateSkill.busy = true
                 task.spawn(function()
-                    if UserInputService.TouchEnabled then 
-                        TriggerMobileButton()
-                    else 
-                        pressSpace() 
-                    end
-                    task.wait(0.2) 
+                    PressSkill()
+                    task.wait(0.2)
                     StateSkill.busy = false
                 end)
             else
-                local lr = line.Rotation % 360
-                local gr = goal.Rotation % 360
+                -- Quantum dynamic offset based on goal velocity
+                local goalVelocity = math.abs(gr - LastGoalRotation)
+                LastGoalRotation = gr
+                local dynamicOffset = math.clamp(goalVelocity * 0.35, 0, 8)
+
                 local startRange, endRange
                 if VD.AutoSkillcheckMode == "Normal" then
-                    startRange = (gr + 116) % 360
-                    endRange   = (gr + 140) % 360
+                    startRange = (gr + 116 - dynamicOffset) % 360
+                    endRange   = (gr + 140 + dynamicOffset) % 360
                 else -- Legit
-                    startRange = (gr + 102) % 360
-                    endRange   = (gr + 116) % 360
+                    startRange = (gr + 102 - dynamicOffset) % 360
+                    endRange   = (gr + 116 + dynamicOffset) % 360
                 end
+
                 local inZone
                 if startRange > endRange then
                     inZone = (lr >= startRange or lr <= endRange)
@@ -1282,7 +1296,7 @@ Onyx.Callbacks.OnSuccess = function()
                 if inZone then
                     StateSkill.busy = true
                     task.spawn(function()
-                        TriggerMobileButton()
+                        PressSkill()
                         task.wait(0.05)
                         StateSkill.busy = false
                     end)
@@ -1296,15 +1310,62 @@ Onyx.Callbacks.OnSuccess = function()
     -- AUTO PARRY
     -- ============================================================
     local ParryState = { ParryCooldown = false }
-    local ParryRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Items") and ReplicatedStorage.Remotes.Items:FindFirstChild("Parrying Dagger") and ReplicatedStorage.Remotes.Items["Parrying Dagger"]:FindFirstChild("parry")
+    local _ExactParryRemote = nil
+    local _LastParryTick = 0
 
-    local function ExecuteParry()
-        if ParryState.ParryCooldown or not ParryRemote then return end
+    -- Quantum: GetParryRemote — auto-discovery dengan fallback scan
+    local function GetParryRemote()
+        if _ExactParryRemote and _ExactParryRemote.Parent then
+            return _ExactParryRemote
+        end
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if not remotes then return nil end
+        local items  = remotes:FindFirstChild("Items")
+        local dagger = items and items:FindFirstChild("Parrying Dagger")
+        if dagger and dagger:FindFirstChild("parry") then
+            _ExactParryRemote = dagger.parry
+        else
+            for _, v in ipairs(remotes:GetDescendants()) do
+                if v:IsA("RemoteEvent") and v.Name:lower() == "parry" then
+                    _ExactParryRemote = v
+                    break
+                end
+            end
+        end
+        return _ExactParryRemote
+    end
+
+    local function GetPingLocal()
+        local ping = 0.08
         pcall(function()
-            for i = 1, 10 do ParryRemote:FireServer() end
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
-            task.wait(0.01)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+            local s = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+            if s and s > 0 then ping = s end
+        end)
+        return math.clamp(ping, 0.03, 1.5)
+    end
+
+    -- Quantum: TriggerParryDagger — ping compensation + predicted position + burst
+    local function ExecuteParry()
+        local now = workspace.DistributedGameTime
+        if now - _LastParryTick < 0.04 then return end
+        local remote = GetParryRemote()
+        if not remote then return end
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if not (root and hum) or hum.Health <= 0 then return end
+
+        _LastParryTick = now
+
+        -- Burst fire — more on high ping
+        local ping = GetPingLocal()
+        local burstCount = ping > 0.18 and 6 or 4
+        task.spawn(function()
+            for i = 1, burstCount do
+                if not VD.Surv_AutoParry or not remote or not remote.Parent then break end
+                pcall(function() remote:FireServer() end)
+                task.wait(0.005)
+            end
         end)
     end
 
