@@ -284,6 +284,26 @@ local function crossToArena()
     return inGameplay()
 end
 
+-- Rarity helpers
+local function getEggRarity(rec)
+    if not rec then return "Common" end
+    local r = rec.Rarity or rec.RarityName or rec.RarityTier
+    if r and type(r) == "string" then
+        for k in pairs(RARITY_ORDER) do
+            if r:lower():find(k:lower(), 1, true) then return k end
+        end
+    end
+    return "Common"
+end
+
+local function meetsRarity(rec)
+    if State.minRarity == "All" then return true end
+    local eggRar = getEggRarity(rec)
+    local minVal = RARITY_ORDER[State.minRarity] or 1
+    local eggVal = RARITY_ORDER[eggRar] or 1
+    return eggVal >= minVal
+end
+
 local function listEggs()
     if not EggCmds then return {} end
     local snap
@@ -301,8 +321,10 @@ local function listEggs()
         if type(rec) == "table" and rec.State == "Slot" and type(rec.Uid) == "string" then
             local pos = rec.BottomCFrame and rec.BottomCFrame.Position
             if pos and onGameplaySide(pos) then
-                local dist = hrp and (pos - hrp.Position).Magnitude or math.huge
-                table.insert(list, { rec=rec, dist=dist })
+                if meetsRarity(rec) then
+                    local dist = hrp and (pos - hrp.Position).Magnitude or math.huge
+                    table.insert(list, { rec=rec, dist=dist })
+                end
             end
         end
     end
@@ -523,6 +545,24 @@ secFarm:AddSlider({
     Increment = 0.1,
     Flag      = "holdWait",
     Callback  = function(v) HOLD_WAIT = v end,
+})
+
+secFarm:AddDropdown({
+    Text    = "Minimum Rarity",
+    Options = {"All","Uncommon","Rare","Epic","Legendary","Mythic","Divine","Secret"},
+    Default = "All",
+    Flag    = "minRarity",
+    Callback = function(v)
+        State.minRarity = v
+        Notify("SAE", "Min rarity: "..v, "info", 2)
+    end,
+})
+
+secFarm:AddToggle({
+    Text     = "Prefer High Value",
+    Default  = true,
+    Flag     = "preferHigh",
+    Callback = function(v) State.preferHighValue = v end,
 })
 
 -- Status display
