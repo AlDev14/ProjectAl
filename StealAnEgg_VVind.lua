@@ -76,31 +76,104 @@ local State = {
 local EggCmds, PlotCmds, Guard, Lookup, Network
 
 local function loadModules()
-    local Lib     = ReplicatedStorage:WaitForChild("Library", 20)
-    if not Lib then return false end
-    local Client  = Lib:WaitForChild("Client", 10)
-    local Util    = Lib:WaitForChild("Util", 10)
-
     local function soft(inst)
         if not inst then return nil end
         local ok, r = pcall(require, inst)
         return ok and r or nil
     end
 
-    EggCmds  = soft(Client:FindFirstChild("EggCmds"))
-    PlotCmds = soft(Client:FindFirstChild("PlotCmds"))
-    Guard    = soft(Client:FindFirstChild("ToolGameplayGuard"))
-    Lookup   = soft(Util and Util:FindFirstChild("GuardAreaLookupUtil"))
-    Network  = soft(ReplicatedStorage:FindFirstChild("Packages") and
-                    ReplicatedStorage.Packages:FindFirstChild("Networking"))
+    -- Coba Network dulu (selalu ada)
+    local pkgs = ReplicatedStorage:FindFirstChild("Packages")
+    Network = soft(pkgs and pkgs:FindFirstChild("Networking"))
 
-    return EggCmds ~= nil and PlotCmds ~= nil
+    -- Coba multiple path untuk Library
+    local Lib = ReplicatedStorage:FindFirstChild("Library")
+        or ReplicatedStorage:FindFirstChild("Lib")
+        or ReplicatedStorage:FindFirstChild("Shared")
+
+    if not Lib then
+        -- Tunggu sebentar
+        task.wait(2)
+        Lib = ReplicatedStorage:FindFirstChild("Library")
+            or ReplicatedStorage:FindFirstChild("Lib")
+    end
+
+    if Lib then
+        local Client = Lib:FindFirstChild("Client")
+        local Util   = Lib:FindFirstChild("Util")
+        if Client then
+            EggCmds  = soft(Client:FindFirstChild("EggCmds"))
+            PlotCmds = soft(Client:FindFirstChild("PlotCmds"))
+            Guard    = soft(Client:FindFirstChild("ToolGameplayGuard"))
+                or soft(Client:FindFirstChild("GameplayGuard"))
+        end
+        if Util then
+            Lookup = soft(Util:FindFirstChild("GuardAreaLookupUtil"))
+                or soft(Util:FindFirstChild("AreaLookup"))
+        end
+    end
+
+    -- Fallback: cari di PlayerScripts
+    if not EggCmds then
+        local ps = LocalPlayer:FindFirstChild("PlayerScripts")
+        if ps then
+            local Game = ps:FindFirstChild("Game")
+            local Eggs = Game and (Game:FindFirstChild("Eggs") or Game:FindFirstChild("EggCmds"))
+            if Eggs then
+                EggCmds = soft(Eggs:FindFirstChild("EggCmds"))
+                    or soft(Eggs)
+            end
+            local Plots = Game and Game:FindFirstChild("Plots")
+            if Plots then
+                PlotCmds = soft(Plots:FindFirstChild("PlotCmds"))
+            end
+            -- Guard
+            local Controllers = Game and Game:FindFirstChild("Controllers")
+            if Controllers then
+                Guard = soft(Controllers:FindFirstChild("ToolGameplayGuard"))
+            end
+        end
+    end
+
+    -- Fallback: pakai EggWorld dari Shared.Remotes langsung
+    if not EggCmds and Network then
+        -- Build minimal EggCmds dari Shared.Remotes namespace
+        local ok, EggWorld = pcall(function()
+            return Network.namespace({name="EggWorld"})
+        end)
+        if ok and EggWorld then
+            EggCmds = {
+                RequestCarryAreaEgg = function(uid)
+                    if EggWorld.AskFieldEggCarry then
+                        return EggWorld.AskFieldEggCarry:InvokeServer(uid)
+                    end
+                end,
+                RequestPlaceEgg = function(uid, cf)
+                    if EggWorld.AskPlaceEgg then
+                        return EggWorld.AskPlaceEgg:InvokeServer(uid, cf)
+                    end
+                end,
+                GetAreaEggSnapshot = function() return nil end,
+                RequestAreaEggSnapshot = function() return nil end,
+                GetAreaEggRecord = function() return nil end,
+            }
+            print("[SAE] EggCmds built from Shared.Remotes EggWorld")
+        end
+    end
+
+    print("[SAE] Modules:", 
+        "EggCmds="..tostring(EggCmds~=nil),
+        "PlotCmds="..tostring(PlotCmds~=nil),
+        "Guard="..tostring(Guard~=nil),
+        "Network="..tostring(Network~=nil))
+
+    return EggCmds ~= nil
 end
 
 local modulesOK = loadModules()
 if not modulesOK then
-    Notify("SAE", "Game modules tidak tersedia", "error", 5)
-    warn("[SAE] Modules unavailable")
+    Notify("SAE", "Modules partial - coba steal tetap jalan", "warning", 5)
+    warn("[SAE] Some modules unavailable - partial mode")
 end
 
 -- ============================================================
