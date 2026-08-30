@@ -1232,36 +1232,6 @@ Onyx.Callbacks.OnSuccess = function()
             end
         end
 
-        -- Auto Parry Circle ESP (WisnuVip)
-        local hrpCircle = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if VD.Surv_AutoParry and hrpCircle then
-            if not ParryState.AutoParryAdornment or ParryState.AutoParryAdornment.Parent ~= hrpCircle then
-                if ParryState.AutoParryAdornment then ParryState.AutoParryAdornment:Destroy() end
-                local adorn = Instance.new("CylinderHandleAdornment")
-                adorn.Name = "AutoParryCircleESP"
-                adorn.Height = 0.05
-                adorn.Transparency = 0.3
-                adorn.Adornee = hrpCircle
-                adorn.Parent = hrpCircle
-                adorn.ZIndex = 0
-                adorn.AlwaysOnTop = false
-                ParryState.AutoParryAdornment = adorn
-            end
-            local cR = VD.Surv_ParryRange or 15
-            ParryState.AutoParryAdornment.Radius = cR
-            ParryState.AutoParryAdornment.InnerRadius = math.max(0.1, cR - 0.15)
-            ParryState.AutoParryAdornment.CFrame = CFrame.new(0, -3, 0) * CFrame.Angles(math.rad(90), 0, 0)
-            if ParryState.ParryCooldown then
-                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(255, 128, 0)
-            elseif VD.Surv_ParryAggressive then
-                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(255, 0, 0)
-            else
-                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(0, 255, 255)
-            end
-        elseif ParryState.AutoParryAdornment then
-            ParryState.AutoParryAdornment:Destroy()
-            ParryState.AutoParryAdornment = nil
-        end
     end)
 
     -- ============================================================
@@ -1594,6 +1564,41 @@ Onyx.Callbacks.OnSuccess = function()
     Players.PlayerAdded:Connect(function(p)
         if p ~= LocalPlayer then
             p.CharacterAdded:Connect(function(char) AttachParrySensor(char) end)
+        end
+    end)
+
+    -- ============================================================
+    -- AUTO PARRY CIRCLE ESP (terpisah, setelah ParryState didefinisikan)
+    -- ============================================================
+    RunService.RenderStepped:Connect(function()
+        local hrpCircle = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if VD.Surv_AutoParry and hrpCircle then
+            if not ParryState.AutoParryAdornment or ParryState.AutoParryAdornment.Parent ~= hrpCircle then
+                if ParryState.AutoParryAdornment then ParryState.AutoParryAdornment:Destroy() end
+                local adorn = Instance.new("CylinderHandleAdornment")
+                adorn.Name = "AutoParryCircleESP"
+                adorn.Height = 0.05
+                adorn.Transparency = 0.3
+                adorn.Adornee = hrpCircle
+                adorn.Parent = hrpCircle
+                adorn.ZIndex = 0
+                adorn.AlwaysOnTop = false
+                ParryState.AutoParryAdornment = adorn
+            end
+            local cR = VD.Surv_ParryRange or 15
+            ParryState.AutoParryAdornment.Radius = cR
+            ParryState.AutoParryAdornment.InnerRadius = math.max(0.1, cR - 0.15)
+            ParryState.AutoParryAdornment.CFrame = CFrame.new(0, -3, 0) * CFrame.Angles(math.rad(90), 0, 0)
+            if ParryState.ParryCooldown then
+                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(255, 128, 0)
+            elseif VD.Surv_ParryAggressive then
+                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(255, 0, 0)
+            else
+                ParryState.AutoParryAdornment.Color3 = Color3.fromRGB(0, 255, 255)
+            end
+        elseif ParryState.AutoParryAdornment then
+            ParryState.AutoParryAdornment:Destroy()
+            ParryState.AutoParryAdornment = nil
         end
     end)
 
