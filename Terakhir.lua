@@ -483,7 +483,10 @@ Onyx.Callbacks.OnSuccess = function()
                             local color
                             local isKiller = IsKiller(player)
                             if isKiller then
-                                if VD.ESP_Killer then color = COLORS.Killer end
+                                -- Sembunyikan ESP killer saat Veil silent aim aktif (reduce noise)
+                                if VD.ESP_Killer and not (VD.Veil_SilentAim and isAimingVeil) then
+                                    color = COLORS.Killer
+                                end
                             else
                                 if VD.ESP_Survivor then color = COLORS.Survivor end
                             end
@@ -891,6 +894,9 @@ Onyx.Callbacks.OnSuccess = function()
         and ReplicatedStorage.Remotes.Items.Veil:FindFirstChild("Activate")
 
     local function getVeilTarget()
+        -- Improve: FOV viewport-based + pilih target terdekat ke crosshair
+        local cam = workspace.CurrentCamera
+        local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
         local myChar = LocalPlayer.Character
         local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myHRP then return nil end
@@ -900,10 +906,16 @@ Onyx.Callbacks.OnSuccess = function()
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
                 local hrp = p.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health > 0 and hrp then
-                    local dist = (hrp.Position - myHRP.Position).Magnitude
-                    if dist < bestDist and dist <= 50 then
-                        bestDist = dist
-                        best = hrp
+                    local dist3D = (hrp.Position - myHRP.Position).Magnitude
+                    if dist3D <= 60 then
+                        local screenPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
+                        if onScreen then
+                            local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                            if dist2D < bestDist then
+                                bestDist = dist2D
+                                best = hrp
+                            end
+                        end
                     end
                 end
             end
@@ -963,17 +975,26 @@ Onyx.Callbacks.OnSuccess = function()
             or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Twist of Fate"))
         if not twistOfFate then return end
 
-        -- Weapon arg: cari gun/EmperorGun di Right Arm
+        -- Weapon arg: cari gun/EmperorGun di semua arm (improve dari Oxio)
         local weaponArg = twistOfFate
+        -- Cari di Right Arm dulu, lalu Left Arm, lalu langsung
+        local function findGun(parent)
+            if not parent then return nil end
+            return parent:FindFirstChild("EmperorGun")
+                or parent:FindFirstChild("gun")
+                or parent:FindFirstChild("Gun")
+                or parent:FindFirstChild("Pistol")
+                or parent:FindFirstChild("Weapon")
+        end
         local rightArm = twistOfFate:FindFirstChild("Right Arm")
-        if rightArm then
-            if rightArm:FindFirstChild("EmperorGun") then
-                weaponArg = rightArm:FindFirstChild("EmperorGun")
-            elseif rightArm:FindFirstChild("gun") then
-                weaponArg = rightArm:FindFirstChild("gun")
-            else
-                weaponArg = rightArm
-            end
+            or twistOfFate:FindFirstChild("RightHand")
+        local leftArm  = twistOfFate:FindFirstChild("Left Arm")
+            or twistOfFate:FindFirstChild("LeftHand")
+        local gun = findGun(rightArm) or findGun(leftArm) or findGun(twistOfFate)
+        if gun then
+            weaponArg = gun
+        elseif rightArm then
+            weaponArg = rightArm
         end
 
         -- Predicted aim direction (Oxio logic)
@@ -1276,42 +1297,62 @@ Onyx.Callbacks.OnSuccess = function()
     local GuiService = game:GetService("GuiService")
     local LastTriggerTick = 0
 
-    -- Quantum: PressSkill — firesignal → VIM touch → Space
+    -- PressSkill — 40%.txt path + firesignal + VIM touch + Space
+    local ActionPath = "Survivor-mob.Controls.action.check"
+    local TouchID_SC = 8822
+
+    -- Path-based target (dari 40%.txt) — lebih akurat dari scan recursive
+    local function GetActionTarget()
+        local current = PlayerGui
+        for segment in string.gmatch(ActionPath, "[^%.]+") do
+            current = current and current:FindFirstChild(segment)
+        end
+        return current
+    end
+
     local function PressSkill()
         if workspace.DistributedGameTime - LastTriggerTick < 0.08 then return end
         LastTriggerTick = workspace.DistributedGameTime
 
-        local btn = PlayerGui:FindFirstChild("check", true)
+        -- Layer 1: path-based button (dari 40%.txt)
+        local btn = GetActionTarget()
+
+        -- Layer 2: scan recursive fallback
+        if not btn or not btn.Visible then
+            btn = PlayerGui:FindFirstChild("check", true)
+        end
+
         if btn and btn:IsA("GuiObject") and btn.Visible then
-            -- firesignal (most reliable on mobile)
+            -- firesignal (paling reliable)
             if type(firesignal) == "function" then
                 pcall(function()
-                    firesignal(btn.MouseButton1Click)
+                    firesignal(btn.MouseButton1Down)
+                    task.wait(0.005)
+                    firesignal(btn.MouseButton1Up)
                 end)
                 return
             end
-            -- VIM touch fallback
+            -- VIM touch (dari 40%.txt: pakai 0/2, bukan Enum)
             pcall(function()
-                local pos = btn.AbsolutePosition
-                local size = btn.AbsoluteSize
+                local pos   = btn.AbsolutePosition
+                local size  = btn.AbsoluteSize
                 local inset = GuiService:GetGuiInset()
-                local x = pos.X + (size.X/2) + inset.X
-                local y = pos.Y + (size.Y/2) + inset.Y
-                VirtualInputManager:SendTouchEvent(8822, Enum.UserInputState.Begin.Value, x, y)
-                task.wait()
-                VirtualInputManager:SendTouchEvent(8822, Enum.UserInputState.End.Value, x, y)
+                local cx = pos.X + (size.X/2) + inset.X
+                local cy = pos.Y + (size.Y/2) + inset.Y
+                VirtualInputManager:SendTouchEvent(TouchID_SC, 0, cx, cy)
+                task.wait(0.01)
+                VirtualInputManager:SendTouchEvent(TouchID_SC, 2, cx, cy)
             end)
             return
         end
 
-        -- PC fallback: Space key
+        -- Space fallback (PC)
         pcall(function()
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
             task.wait()
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
         end)
     end
-    -- alias untuk backward compat
     local TriggerMobileButton = PressSkill
 
     -- Quantum: GetSkillCheck — multi-GUI fallback scan
