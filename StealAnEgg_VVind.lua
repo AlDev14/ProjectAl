@@ -51,7 +51,6 @@ local Workspace         = game:GetService("Workspace")
 local VirtualUser       = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
-local TRAVEL_SPEED = 24  -- studs/s lerp speed (sedikit di atas normal, tidak mencolok)
 local HOLD_WAIT    = 0.6  -- simulate hold duration
 
 -- Notify helper
@@ -105,58 +104,66 @@ if not modulesOK then
 end
 
 -- ============================================================
--- MOVEMENT — smooth lerp (tidak write WalkSpeed)
+-- MOVEMENT — Humanoid:MoveTo (natural walk, anti-BAC)
+-- Speed dikontrol game (SpeedPower system)
 -- ============================================================
 local function root()
     local char = LocalPlayer.Character
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
-local function zeroVel(hrp)
-    if not hrp then return end
-    pcall(function()
-        hrp.AssemblyLinearVelocity  = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-    end)
+local function hum()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
 end
 
-local function smoothLerp(goal, speed)
-    local hrp = root()
-    if not hrp or not goal then return false end
-    speed = speed or TRAVEL_SPEED
-    local dist = (hrp.Position - goal).Magnitude
-    if dist < 2 then return true end
-    local steps = math.max(8, math.floor(dist / speed * 60))
-    local from = hrp.Position
-    for i = 1, steps do
-        if not State.running then return false end
-        hrp = root()
-        if not hrp then return false end
-        local alpha = i / steps
-        local p = from:Lerp(goal, alpha)
-        local newCF = CFrame.new(p.X, math.max(p.Y, hrp.Position.Y), p.Z)
-        hrp.CFrame = newCF
-        zeroVel(hrp)
-        -- fire pivot ke server kalau tersedia
-        if Network then
-            pcall(function()
-                local NetMap = Network.NET_MAP or {}
-                local pivotKey = (NetMap.ClientCharacter and NetMap.ClientCharacter.SET_PIVOT)
-                    or "ClientCharacter: SetPivot"
-                Network.Fire(pivotKey, newCF)
-            end)
-        end
-        task.wait(1/60)
-    end
-    return true
-end
-
-local function walkTo(goal, speed)
+-- walkTo: pakai Humanoid:Move fisik, tidak set CFrame
+-- timeout = detik maksimal jalan
+local function walkTo(goal, timeout)
     if typeof(goal) ~= "Vector3" then
         goal = goal and goal.Position
     end
     if not goal then return false end
-    return smoothLerp(goal + Vector3.new(0, 2, 0), speed)
+
+    local h = hum()
+    local r = root()
+    if not h or not r then return false end
+
+    timeout = timeout or 45
+    local ARRIVE_DIST = 4.5
+
+    -- Kalau sudah dekat, tidak perlu jalan
+    if (r.Position - goal).Magnitude <= ARRIVE_DIST then return true end
+
+    -- Pakai MoveTo untuk navigasi (game handles movement)
+    h:MoveTo(goal)
+
+    local t0 = workspace.DistributedGameTime
+    while workspace.DistributedGameTime - t0 < timeout and State.running do
+        r = root()
+        if not r then break end
+
+        local dist = (goal - r.Position).Magnitude
+        if dist <= ARRIVE_DIST then
+            h = hum()
+            if h then h:Move(Vector3.zero, false) end
+            return true
+        end
+
+        -- Re-direct setiap 0.15s agar tidak nyangkut
+        local flat = Vector3.new(goal.X - r.Position.X, 0, goal.Z - r.Position.Z)
+        if flat.Magnitude > 0.3 then
+            h = hum()
+            if h then h:Move(flat.Unit, false) end
+        end
+
+        task.wait(0.15)
+    end
+
+    h = hum()
+    if h then h:Move(Vector3.zero, false) end
+    r = root()
+    return r and (r.Position - goal).Magnitude <= 10
 end
 
 -- ============================================================
@@ -198,8 +205,8 @@ local function crossToArena()
     local safePos = line.Position - Vector3.new(55, 0, 0)
     local playPos = line.Position + Vector3.new(55, 4, 0)
     State.status = "Masuk arena"
-    walkTo(safePos)
-    walkTo(playPos)
+    walkTo(safePos, 20)
+    walkTo(playPos, 25)
     task.wait(0.2)
     return inGameplay()
 end
@@ -402,8 +409,8 @@ local tabFarm = Window:AddTab({ Name = "Farm", Icon = "Lucide:zap" })
 local secFarm = tabFarm:AddSubTab({ Name = "Auto Steal", Icon = "Lucide:egg" })
 
 secFarm:AddParagraph({
-    Title = "Status",
-    Text  = "Toggle Auto Steal untuk mulai farm otomatis.",
+    Title = "Info",
+    Text  = "Karakter jalan fisik pakai movement game (anti-BAC). Speed farm = SpeedPower character di game.",
 })
 
 secFarm:AddToggle({
@@ -433,15 +440,7 @@ secFarm:AddButton({
     end,
 })
 
-secFarm:AddSlider({
-    Text      = "Travel Speed",
-    Min       = 12,
-    Max       = 32,
-    Default   = 24,
-    Increment = 1,
-    Flag      = "travelSpeed",
-    Callback  = function(v) TRAVEL_SPEED = v end,
-})
+-- Travel Speed dikontrol game (SpeedPower), tidak ada slider manual
 
 secFarm:AddSlider({
     Text      = "Hold Duration (s)",
