@@ -186,7 +186,9 @@ Onyx.Callbacks.OnSuccess = function()
     end
 
     local function IsKiller(player)
-        return player and player.Team and player.Team.Name == "Killer"
+        if not player or not player.Team then return false end
+        local name = player.Team.Name
+        return name == "Killer" or name == "Killers"
     end
 
     local ItemsFolder = ReplicatedStorage:WaitForChild("Items", 5)
@@ -492,6 +494,9 @@ Onyx.Callbacks.OnSuccess = function()
                             end
                             if color then
                                 createHighlight(char, color)
+                            else
+                                -- Hapus highlight lama kalau tidak ada color (disabled/hidden)
+                                removeHighlight(char)
                                 local itemIcon = nil
                                 if VD.ESP_ShowItem then
                                     local equipped = player:GetAttribute("EquippedItem") or char:GetAttribute("EquippedItem")
@@ -975,26 +980,17 @@ Onyx.Callbacks.OnSuccess = function()
             or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Twist of Fate"))
         if not twistOfFate then return end
 
-        -- Weapon arg: cari gun/EmperorGun di semua arm (improve dari Oxio)
+        -- Weapon arg: cari gun/EmperorGun di Right Arm (Oxio original)
         local weaponArg = twistOfFate
-        -- Cari di Right Arm dulu, lalu Left Arm, lalu langsung
-        local function findGun(parent)
-            if not parent then return nil end
-            return parent:FindFirstChild("EmperorGun")
-                or parent:FindFirstChild("gun")
-                or parent:FindFirstChild("Gun")
-                or parent:FindFirstChild("Pistol")
-                or parent:FindFirstChild("Weapon")
-        end
         local rightArm = twistOfFate:FindFirstChild("Right Arm")
-            or twistOfFate:FindFirstChild("RightHand")
-        local leftArm  = twistOfFate:FindFirstChild("Left Arm")
-            or twistOfFate:FindFirstChild("LeftHand")
-        local gun = findGun(rightArm) or findGun(leftArm) or findGun(twistOfFate)
-        if gun then
-            weaponArg = gun
-        elseif rightArm then
-            weaponArg = rightArm
+        if rightArm then
+            if rightArm:FindFirstChild("EmperorGun") then
+                weaponArg = rightArm:FindFirstChild("EmperorGun")
+            elseif rightArm:FindFirstChild("gun") then
+                weaponArg = rightArm:FindFirstChild("gun")
+            else
+                weaponArg = rightArm
+            end
         end
 
         -- Predicted aim direction (Oxio logic)
@@ -1317,9 +1313,10 @@ Onyx.Callbacks.OnSuccess = function()
         -- Layer 1: path-based button (dari 40%.txt)
         local btn = GetActionTarget()
 
-        -- Layer 2: scan recursive fallback
+        -- Layer 2: scan recursive fallback (cari "check" dan "action")
         if not btn or not btn.Visible then
             btn = PlayerGui:FindFirstChild("check", true)
+                or PlayerGui:FindFirstChild("action", true)
         end
 
         if btn and btn:IsA("GuiObject") and btn.Visible then
