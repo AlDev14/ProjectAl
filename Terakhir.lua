@@ -3014,6 +3014,51 @@ Onyx.Callbacks.OnSuccess = function()
         Callback = function() updateESP(); Notify("ESP", "Refreshed", "success", 2) end
     })
 
+    -- Color Pickers
+    local secESPColor = mkSec(tabESP, "ESP Colors", "Lucide:palette")
+    secESPColor:AddColorPicker({
+        Text    = "Survivor Color",
+        Flag    = "colorSurvivor",
+        Default = COLORS.Survivor,
+        Callback = function(c) COLORS.Survivor = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "Killer Color",
+        Flag    = "colorKiller",
+        Default = COLORS.Killer,
+        Callback = function(c) COLORS.Killer = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "Generator Color",
+        Flag    = "colorGenerator",
+        Default = COLORS.Generator,
+        Callback = function(c) COLORS.Generator = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "Pallet Color",
+        Flag    = "colorPallet",
+        Default = COLORS.Pallet,
+        Callback = function(c) COLORS.Pallet = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "Window Color",
+        Flag    = "colorWindow",
+        Default = COLORS.Window,
+        Callback = function(c) COLORS.Window = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "SCP Color",
+        Flag    = "colorSCP",
+        Default = COLORS.SCP,
+        Callback = function(c) COLORS.SCP = c; updateESP() end,
+    })
+    secESPColor:AddColorPicker({
+        Text    = "Gate Color",
+        Flag    = "colorGate",
+        Default = COLORS.Gate,
+        Callback = function(c) COLORS.Gate = c; updateESP() end,
+    })
+
     local secVisual = mkSec(tabESP, "Visual Settings")
     secVisual:AddToggle({ 
         Text = "No Shadow",
