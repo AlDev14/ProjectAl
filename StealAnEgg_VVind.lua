@@ -13,10 +13,12 @@
 -- Harus dijalankan PERTAMA sebelum game modules load
 -- Reference AC ke Humanoid asli jadi invalid
 -- ============================================================
+local _LocalPlayer = game:GetService("Players").LocalPlayer
+
 local function doHumanoidBypass()
-    local char = LocalPlayer.Character
+    local char = _LocalPlayer.Character
     if not char then
-        char = LocalPlayer.CharacterAdded:Wait()
+        char = _LocalPlayer.CharacterAdded:Wait()
     end
     local origHum = char:FindFirstChildOfClass("Humanoid")
         or char:WaitForChild("Humanoid", 10)
@@ -46,7 +48,7 @@ end
 doHumanoidBypass()
 
 -- Re-apply setiap respawn
-LocalPlayer.CharacterAdded:Connect(function(char)
+_LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.3)
     doHumanoidBypass()
 end)
