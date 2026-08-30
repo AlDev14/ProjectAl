@@ -3242,20 +3242,11 @@ Onyx.Callbacks.OnSuccess = function()
     -- ============================================================
     local secCutscene = mkSec(tabMisc, "Cutscene", "Lucide:film")
     secCutscene:AddToggle({ Text = "Skip Cutscene",
-        Description = "Otomatis skip/hide cutscene saat round start",
         Default = VD.SkipCutscene,
         Flag = "SkipCutscene",
         Callback = function(v)
             VD.SkipCutscene = v
             if v then pcall(TrySkipCutscene) end
-        end,
-    })
-    secCutscene:AddButton({
-        Text = "Skip Now",
-        Icon = "Lucide:fast-forward",
-        Callback = function()
-            pcall(TrySkipCutscene)
-            Notify("Skip Cutscene", "Done", "success", 2)
         end,
     })
 
