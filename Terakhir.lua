@@ -1265,86 +1265,33 @@ Onyx.Callbacks.OnSuccess = function()
     end)
 
     -- ============================================================
-    -- TOF SILENT AIM NAMECALL HOOK (dari w424)
+    -- ANTI BLIND (Killer) — hookmetamethod minimal
+    -- ToF Silent Aim sekarang pakai Oxio executeSilentAimFire()
     -- ============================================================
     do
-        local _tofDeferred = false
-        local oldNamecall2
         local _hm = (type(hookmetamethod)=="function") and hookmetamethod or nil
         local _nc = (type(newcclosure)=="function") and newcclosure or function(f) return f end
         local _cc = (type(checkcaller)=="function") and checkcaller or function() return false end
         local _gn = (type(getnamecallmethod)=="function") and getnamecallmethod or function() return "" end
 
-        local ToFRemote = ReplicatedStorage:FindFirstChild("Remotes")
-            and ReplicatedStorage.Remotes:FindFirstChild("Items")
-            and ReplicatedStorage.Remotes.Items:FindFirstChild("Twist of Fate")
-            and ReplicatedStorage.Remotes.Items["Twist of Fate"]:FindFirstChild("Fire")
-
-        if _hm and ToFRemote then
-            oldNamecall2 = _hm(game, "__namecall", _nc(function(self, ...)
-                local method = _gn()
-                local args = {...}
-
-                -- Anti Blind (Killer)
-                if not _cc() and method == "FireServer" then
-                    local GotBlindedR = ReplicatedStorage:FindFirstChild("Remotes")
-                        and ReplicatedStorage.Remotes:FindFirstChild("Items")
-                        and ReplicatedStorage.Remotes.Items:FindFirstChild("Flashlight")
-                        and ReplicatedStorage.Remotes.Items.Flashlight:FindFirstChild("GotBlinded")
-                    if GotBlindedR and self == GotBlindedR then
+        if _hm then
+            local oldNC
+            pcall(function()
+                local GotBlindedR = ReplicatedStorage:FindFirstChild("Remotes")
+                    and ReplicatedStorage.Remotes:FindFirstChild("Items")
+                    and ReplicatedStorage.Remotes.Items:FindFirstChild("Flashlight")
+                    and ReplicatedStorage.Remotes.Items.Flashlight:FindFirstChild("GotBlinded")
+                if not GotBlindedR then return end
+                oldNC = _hm(game, "__namecall", _nc(function(self, ...)
+                    local method = _gn()
+                    if not _cc() and method == "FireServer" and self == GotBlindedR then
                         if LocalPlayer.Team and LocalPlayer.Team.Name == "Killer" then
                             return nil
                         end
                     end
-                end
-
-                -- ToF Silent Aim hook
-                if _tofDeferred then
-                    return oldNamecall2(self, ...)
-                elseif VD.Veil_SilentAim and ToFRemote and self == ToFRemote
-                    and method == "FireServer" and not _cc() then
-
-                    if typeof(args[1]) == "Instance" and typeof(args[2]) == "Vector3" then
-                        local myChar = LocalPlayer.Character
-                        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                        if myRoot then
-                            local bestPart, bestDist = nil, 90
-                            for _, plr in ipairs(Players:GetPlayers()) do
-                                if plr ~= LocalPlayer and plr.Character and plr.Team then
-                                    local validTeam = (VD.Pistol_Target == "Killer" and plr.Team.Name == "Killer")
-                                        or (VD.Pistol_Target == "Survivor" and plr.Team.Name == "Survivors")
-                                    if validTeam then
-                                        local targetPart = plr.Character:FindFirstChild("HumanoidRootPart")
-                                        if targetPart then
-                                            local d = (targetPart.Position - myRoot.Position).Magnitude
-                                            if d < bestDist then bestDist = d; bestPart = targetPart end
-                                        end
-                                    end
-                                end
-                            end
-                            if bestPart then
-                                local vel = bestPart.AssemblyLinearVelocity
-                                local dist = bestDist
-                                local speed = 200
-                                local travelTime = dist / speed
-                                local predicted = bestPart.Position + (vel * travelTime)
-                                -- dot threshold check
-                                local camLook = workspace.CurrentCamera.CFrame.LookVector
-                                local toTarget = (predicted - workspace.CurrentCamera.CFrame.Position).Unit
-                                local dot = camLook:Dot(toTarget)
-                                if dot >= 0.5 then
-                                    local newDir = (predicted - myRoot.Position).Unit
-                                    _tofDeferred = true
-                                    local r = oldNamecall2(self, args[1], newDir)
-                                    _tofDeferred = false
-                                    return r
-                                end
-                            end
-                        end
-                    end
-                end
-                return oldNamecall2(self, ...)
-            end))
+                    return oldNC(self, ...)
+                end))
+            end)
         end
     end
 
