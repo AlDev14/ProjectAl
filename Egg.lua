@@ -1028,13 +1028,25 @@ Window:Show()
 Notify("Steal An Egg", "v2.0 loaded!", 3)
 
 -- Cari ScreenGui baru yang ditambahkan oleh Orvion saat Show()
+-- Scan CoreGui + PlayerGui (Orvion bisa taruh di salah satunya)
 local _orvionSG = nil
-for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-    if not _beforeShow[sg] and sg:IsA("ScreenGui") then
-        _orvionSG = sg
-        break
+local function findOrvionSG()
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    -- cek PlayerGui dulu
+    for _, sg in ipairs(pg:GetChildren()) do
+        if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
+            return sg
+        end
     end
+    -- fallback CoreGui
+    for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if not _beforeShow[sg] and sg:IsA("ScreenGui") then
+            return sg
+        end
+    end
+    return nil
 end
+_orvionSG = findOrvionSG()
 
 -- ============================================================
 -- FLOATING TOGGLE BUTTON — SETELAH Window:Show()
