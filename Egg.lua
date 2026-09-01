@@ -1018,35 +1018,16 @@ Window:AddButton(secCfg, "Load Config", "Load saved settings", nil, function()
 end)
 
 -- ── SHOW ──────────────────────────────────────────────────
--- Snapshot CoreGui sebelum Show() — cari yang baru setelah Show()
+-- Snapshot CoreGui + PlayerGui sebelum Show()
 local _beforeShow = {}
-for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-    _beforeShow[sg] = true
-end
+local _pg = LocalPlayer:WaitForChild("PlayerGui")
+for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do _beforeShow[sg] = true end
+for _, sg in ipairs(_pg:GetChildren()) do _beforeShow[sg] = true end
 
 Window:Show()
 Notify("Steal An Egg", "v2.0 loaded!", 3)
 
--- Cari ScreenGui baru yang ditambahkan oleh Orvion saat Show()
--- Scan CoreGui + PlayerGui (Orvion bisa taruh di salah satunya)
 local _orvionSG = nil
-local function findOrvionSG()
-    local pg = LocalPlayer:WaitForChild("PlayerGui")
-    -- cek PlayerGui dulu
-    for _, sg in ipairs(pg:GetChildren()) do
-        if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
-            return sg
-        end
-    end
-    -- fallback CoreGui
-    for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if not _beforeShow[sg] and sg:IsA("ScreenGui") then
-            return sg
-        end
-    end
-    return nil
-end
-_orvionSG = findOrvionSG()
 
 -- ============================================================
 -- FLOATING TOGGLE BUTTON — SETELAH Window:Show()
@@ -1054,7 +1035,24 @@ _orvionSG = findOrvionSG()
 task.spawn(function()
     task.wait(0.3)
 
-    local UIS = UserInputService
+    -- Cari _orvionSG di sini (async, setelah Orvion selesai bikin UI)
+    -- Retry sampai ketemu atau timeout 5 detik
+    local deadline = tick() + 5
+    while not _orvionSG and tick() < deadline do
+        for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
+            if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
+                _orvionSG = sg; break
+            end
+        end
+        if not _orvionSG then
+            for _, sg in ipairs(_pg:GetChildren()) do
+                if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
+                    _orvionSG = sg; break
+                end
+            end
+        end
+        if not _orvionSG then task.wait(0.1) end
+    end
 
     -- Buat button di PlayerGui
     local pg  = LocalPlayer:WaitForChild("PlayerGui")
