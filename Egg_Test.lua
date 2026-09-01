@@ -483,53 +483,57 @@ end)
 -- ============================================================
 -- AUTO SELL — independent loop
 -- ============================================================
--- Auto Sell via RF/Haul/WriteAutoSell (confirmed dari dump)
--- Format: InvokeServer({[rarityId] = true}) — set rarity map
-local function getAutoSellRemote()
+-- Auto Sell via PetSatchel.SellPet / SellEveryPet (confirmed Shared.Remotes decompile)
+local function getSellRemote(name)
     local net = ReplicatedStorage:FindFirstChild("Packages")
         and ReplicatedStorage.Packages:FindFirstChild("Networking")
-    if not net then return nil end
-    return net:FindFirstChild("RF/Haul/WriteAutoSell")
-        or net:FindFirstChild("Kr/Haul/WriteAutoSell")
+    return net and net:FindFirstChild("RE/PetSatchel/" .. name)
 end
 
 local function runAutoSell()
     pcall(function()
-        if not RarityModule then loadModules() end
-
-        local remote = getAutoSellRemote()
-        if not remote then
-            warn("[AutoSell] RF/Haul/WriteAutoSell not found")
+        -- Sell All (pet mode)
+        if State.sellAll then
+            local remote = getSellRemote("SellEveryPet")
+            if remote then
+                remote:FireServer()
+                print("[AutoSell] SellEveryPet fired")
+            else
+                warn("[AutoSell] SellEveryPet remote not found")
+            end
             return
         end
 
-        -- Build rarity map: semua rarity di bawah/sama sellMaxRarity = true
-        local maxNum = getRarityNumberByName(State.sellMaxRarity)
-        local rarityMap = {}
+        -- Sell per egg by rarity filter
+        if not EggState then loadModules() end
+        if not EggState then warn("[AutoSell] EggState nil"); return end
 
-        if RarityModule and RarityModule.Rarities then
-            for id, rar in pairs(RarityModule.Rarities) do
-                local num = type(rar.RarityNumber) == "number" and rar.RarityNumber or 0
-                if State.sellAll or num <= maxNum then
-                    rarityMap[id] = true
-                end
+        local maxNum = getRarityNumberByName(State.sellMaxRarity)
+        local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
+        if not ok or type(owned) ~= "table" or #owned == 0 then
+            print("[AutoSell] owned egg kosong")
+            return
+        end
+
+        local remote = getSellRemote("SellPet")
+        if not remote then
+            warn("[AutoSell] SellPet remote not found")
+            return
+        end
+
+        local sold, skipped = 0, 0
+        for _, rec in ipairs(owned) do
+            if not rec.Uid then continue end
+            local rarNum = getRarityNumber(rec)
+            if rarNum <= maxNum then
+                pcall(function() remote:FireServer(rec.Uid) end)
+                sold += 1
+                task.wait(0.05)
+            else
+                skipped += 1
             end
         end
-
-        if next(rarityMap) == nil then
-            warn("[AutoSell] rarity map kosong, skip")
-            return
-        end
-
-        local ok, res = pcall(function()
-            return remote:InvokeServer(rarityMap)
-        end)
-
-        if ok then
-            print("[AutoSell] OK:", res and tostring(res[1]) or "no result")
-        else
-            warn("[AutoSell] Failed:", tostring(res))
-        end
+        print(string.format("[AutoSell] sold=%d skipped=%d (maxRarity=%s)", sold, skipped, State.sellMaxRarity))
     end)
 end
 
