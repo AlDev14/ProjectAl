@@ -607,23 +607,23 @@ Onyx.Callbacks.OnSuccess = function()
                             if color then
                                 createHighlight(char, color)
                             else
-                                -- Hapus highlight lama kalau tidak ada color (disabled/hidden)
                                 removeHighlight(char)
-                                local itemIcon = nil
-                                if VD.ESP_ShowItem then
-                                    local equipped = player:GetAttribute("EquippedItem") or char:GetAttribute("EquippedItem")
-                                    if equipped then
-                                        itemIcon = getItemIcon(equipped)
-                                    end
-                                end
-                                CreateModernESP(char, "ModernESPName", {
-                                    name = player.Name,
-                                    distance = math.floor(dist),
-                                    color = color,
-                                    icon = itemIcon,
-                                    offsetY = 3.5
-                                })
                             end
+                            -- Billboard selalu dibuat untuk player dalam range
+                            local itemIcon = nil
+                            if VD.ESP_ShowItem then
+                                local equipped = player:GetAttribute("EquippedItem") or char:GetAttribute("EquippedItem")
+                                if equipped then
+                                    itemIcon = getItemIcon(equipped)
+                                end
+                            end
+                            CreateModernESP(char, "ModernESPName", {
+                                name = player.Name,
+                                distance = math.floor(dist),
+                                color = color or Color3.fromRGB(200, 200, 200),
+                                icon = itemIcon,
+                                offsetY = 3.5
+                            })
                         end
                     end
                 end
@@ -1000,7 +1000,7 @@ Onyx.Callbacks.OnSuccess = function()
                 local hrp = p.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health > 0 and hrp then
                     local dist3D = (hrp.Position - myHRP.Position).Magnitude
-                    if dist3D <= 60 then
+                    if dist3D <= 120 then
                         local screenPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
                         if onScreen then
                             local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
@@ -1399,7 +1399,6 @@ Onyx.Callbacks.OnSuccess = function()
     local ScourgeActive = false
 
     -- PressSkill — 40%.txt path + firesignal + VIM touch + Space
-    local ActionPath = "Survivor-mob.Controls.action.check"
     local TouchID_SC = 8822
 
     -- Path-based target (dari 40%.txt) — lebih akurat dari scan recursive
