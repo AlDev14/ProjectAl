@@ -101,6 +101,12 @@ Onyx.Callbacks.OnSuccess = function()
     VD.ESP_Distance         = VD.ESP_Distance         or 5000
     VD.ESP_ShowItem         = VD.ESP_ShowItem         or true
 
+    -- Hide Name
+    VD.HideName             = VD.HideName             or false
+
+    -- TP Generator
+    VD.TeleportGenIndex     = VD.TeleportGenIndex     or 1
+
     -- Silent Aim (Pistol) - DIUPDATE DARI OXIO
     VD.Pistol_SilentAim     = VD.Pistol_SilentAim     or false
     VD.Pistol_BlockKnocked  = VD.Pistol_BlockKnocked  or false
@@ -121,7 +127,7 @@ Onyx.Callbacks.OnSuccess = function()
 
     -- Survivor
     VD.AutoSkillcheck       = VD.AutoSkillcheck       or false
-    VD.AutoSkillcheckMode   = VD.AutoSkillcheckMode   or "Normal"
+    VD.AutoSkillcheckMode   = VD.AutoSkillcheckMode   or "Legit"
     VD.Surv_ParryRange      = VD.Surv_ParryRange      or 15
     VD.Surv_ParrySafety     = VD.Surv_ParrySafety     or false
     VD.Surv_ParryAggressive = VD.Surv_ParryAggressive or false
@@ -276,6 +282,112 @@ Onyx.Callbacks.OnSuccess = function()
             local mesh = char:FindFirstChild("KorlessHead")
             if mesh then mesh:Destroy() end
         end)
+    end
+
+    -- ============================================================
+    -- HIDE NAME SYSTEM
+    -- ============================================================
+    local function applyHideName()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    pcall(function()
+                        if VD.HideName then
+                            hum.DisplayDistanceType   = Enum.HumanoidDisplayDistanceType.None
+                            hum.NameDisplayDistance   = 0
+                            hum.HealthDisplayDistance = 0
+                        else
+                            hum.DisplayDistanceType   = Enum.HumanoidDisplayDistanceType.Subject
+                            hum.NameDisplayDistance   = 100
+                            hum.HealthDisplayDistance = 100
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(p)
+        p.CharacterAdded:Connect(function()
+            task.wait(1)
+            if VD.HideName then applyHideName() end
+        end)
+    end)
+
+    -- Apply ke semua player yang sudah ada saat script load
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if p.Character then
+                task.spawn(function()
+                    if VD.HideName then applyHideName() end
+                end)
+            end
+            p.CharacterAdded:Connect(function()
+                task.wait(1)
+                if VD.HideName then applyHideName() end
+            end)
+        end
+    end
+
+    -- ============================================================
+    -- TP GENERATOR SYSTEM (WISNUVIP)
+    -- ============================================================
+    -- Cache generator list untuk TP index stabil
+    local _genCache = {}
+    local function refreshGenCache()
+        _genCache = {}
+        for _, gen in ipairs(CollectionService:GetTagged("Generator")) do
+            if gen and gen:IsDescendantOf(Workspace) then
+                table.insert(_genCache, gen)
+            end
+        end
+        if #_genCache == 0 then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name == "Generator" and obj:IsA("Model") then
+                    table.insert(_genCache, obj)
+                end
+            end
+        end
+        if #_genCache == 0 then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Model") and (
+                    obj:GetAttribute("RepairProgress") ~= nil or
+                    obj:GetAttribute("Progress") ~= nil or
+                    obj:GetAttribute("ProgressRepair") ~= nil
+                ) then
+                    table.insert(_genCache, obj)
+                end
+            end
+        end
+        return _genCache
+    end
+
+    local function TeleportToGenerator()
+        local root = getRoot()
+        if not root then return end
+        -- Refresh kalau cache kosong atau index sudah habis
+        if #_genCache == 0 or VD.TeleportGenIndex > #_genCache then
+            refreshGenCache()
+            VD.TeleportGenIndex = 1
+        end
+        local gens = _genCache
+        if #gens == 0 then
+            Notify("TP Generator", "No generator found", "error", 2)
+            return
+        end
+        if VD.TeleportGenIndex > #gens then VD.TeleportGenIndex = 1 end
+        local gen = gens[VD.TeleportGenIndex]
+        local part = gen:FindFirstChildWhichIsA("BasePart") or (gen:IsA("BasePart") and gen)
+        if part then
+            pcall(function()
+                root.CFrame = part.CFrame + Vector3.new(0, 4, 0)
+            end)
+            Notify("TP Generator", "Gen " .. VD.TeleportGenIndex .. "/" .. #gens, "success", 1.5)
+        else
+            Notify("TP Generator", "Part not found", "error", 2)
+        end
+        VD.TeleportGenIndex = VD.TeleportGenIndex + 1
     end
 
     -- ============================================================
@@ -467,11 +579,12 @@ Onyx.Callbacks.OnSuccess = function()
 
     local function updateESP()
         clearESP()
-        if not VD.ESP_Enabled then return end
         local root = getRoot()
         if not root then return end
         local maxDist = VD.ESP_Distance
 
+        -- Player ESP (hanya jalan kalau ESP_Enabled aktif)
+        if VD.ESP_Enabled then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local char = player.Character
@@ -516,7 +629,9 @@ Onyx.Callbacks.OnSuccess = function()
                 end
             end
         end
+        end -- end ESP_Enabled
 
+        -- Generator: selalu jalan kalau ESP_Generator aktif (tidak butuh ESP_Enabled)
         if VD.ESP_Generator then
             for _, gen in ipairs(CollectionService:GetTagged("Generator")) do
                 if gen and gen:IsDescendantOf(Workspace) then
@@ -524,12 +639,21 @@ Onyx.Callbacks.OnSuccess = function()
                     if part then
                         local dist = (part.Position - root.Position).Magnitude
                         if dist <= maxDist then
-                            -- Baca progress dari beberapa attribute
+                            -- Baca progress dari beberapa attribute + child ValueBase
                             local progress = gen:GetAttribute("RepairProgress")
                                 or gen:GetAttribute("Progress")
                                 or gen:GetAttribute("ProgressRepair")
-                                or gen:GetAttribute("kickcount")
-                                or 0
+                            -- fallback: cek child IntValue/NumberValue bernama progress
+                            if progress == nil then
+                                for _, c in ipairs(gen:GetChildren()) do
+                                    local n = c.Name:lower()
+                                    if (n == "repairprogress" or n == "progress" or n == "progressrepair") then
+                                        pcall(function() progress = c.Value end)
+                                        if progress then break end
+                                    end
+                                end
+                            end
+                            progress = tonumber(progress) or 0
 
                             -- Normalize 0-100
                             if progress > 0 and progress <= 1 then
@@ -634,23 +758,29 @@ Onyx.Callbacks.OnSuccess = function()
     -- ============================================================
     -- UNLOCK SKILLS WHILE CARRYING + DOUBLE DAMAGE GENERATOR
     -- ============================================================
+    -- Fallback executor compat
+    local _newcclosure = (type(newcclosure) == "function") and newcclosure or function(f) return f end
+    local _checkcaller = (type(checkcaller) == "function") and checkcaller or function() return false end
+
     local oldNamecall = nil
     function SetupUnlockSkillsCarry()
         if oldNamecall then return end
-        local mt = getrawmetatable(game)
+        local ok, mt = pcall(getrawmetatable, game)
+        if not ok or not mt then return end
         oldNamecall = mt.__namecall
-        setreadonly(mt, false)
-        mt.__namecall = newcclosure(function(self, ...)
+        pcall(setreadonly, mt, false)
+        mt.__namecall = _newcclosure(function(self, ...)
             local method = getnamecallmethod()
             local args = {...}
-            if VD.UnlockSkillsCarry and method == "GetAttribute" and not checkcaller() then
+            if VD.UnlockSkillsCarry and method == "GetAttribute" and not _checkcaller() then
                 if args[1] == "IsCarrying" then
                     return false
                 end
             end
-            if VD.DoubleDamageGen and method == "FireServer" and not checkcaller() then
-                local selfName = tostring(self):lower()
-                if selfName:find("breakgenevent") then
+            if VD.DoubleDamageGen and method == "FireServer" and not _checkcaller() then
+                local ok2, selfName2 = pcall(function() return self.Name end)
+                local selfName = (ok2 and selfName2 or tostring(self)):lower()
+                if selfName:find("breakgenevent") or selfName:find("kickgenevent") or selfName:find("kick") or selfName:find("break") then
                     local result = oldNamecall(self, ...)
                     task.spawn(function()
                         for _ = 1, 3 do
@@ -663,7 +793,7 @@ Onyx.Callbacks.OnSuccess = function()
             end
             return oldNamecall(self, ...)
         end)
-        setreadonly(mt, true)
+        pcall(setreadonly, mt, true)
     end
 
     -- ============================================================
@@ -830,10 +960,31 @@ Onyx.Callbacks.OnSuccess = function()
         return bestTarget
     end
 
-    local VeilRemote = ReplicatedStorage:FindFirstChild("Remotes")
-        and ReplicatedStorage.Remotes:FindFirstChild("Items")
-        and ReplicatedStorage.Remotes.Items:FindFirstChild("Veil")
-        and ReplicatedStorage.Remotes.Items.Veil:FindFirstChild("Activate")
+    -- Lazy init VeilRemote — fetch saat dipakai, bukan saat load
+    local VeilRemote = nil
+    local function getVeilRemote()
+        if VeilRemote and VeilRemote.Parent then return VeilRemote end
+        -- coba path utama
+        pcall(function()
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            local items = r and r:FindFirstChild("Items")
+            local veil  = items and items:FindFirstChild("Veil")
+            VeilRemote  = veil and (veil:FindFirstChild("Activate") or veil:FindFirstChild("activate") or veil:FindFirstChild("Fire"))
+        end)
+        -- fallback: scan semua remote di Remotes
+        if not VeilRemote then
+            pcall(function()
+                local r = ReplicatedStorage:FindFirstChild("Remotes")
+                if not r then return end
+                for _, v in ipairs(r:GetDescendants()) do
+                    if v:IsA("RemoteEvent") and v.Parent and v.Parent.Name:lower():find("veil") then
+                        VeilRemote = v; break
+                    end
+                end
+            end)
+        end
+        return VeilRemote
+    end
 
     local function getVeilTarget()
         -- Improve: FOV viewport-based + pilih target terdekat ke crosshair
@@ -867,8 +1018,9 @@ Onyx.Callbacks.OnSuccess = function()
 
     local function executeVeilSilentAim()
         local target = getVeilTarget()
-        if target and VeilRemote then
-            pcall(function() VeilRemote:FireServer(target) end)
+        local remote = getVeilRemote()
+        if target and remote then
+            pcall(function() remote:FireServer(target) end)
         end
     end
 
@@ -1220,7 +1372,7 @@ Onyx.Callbacks.OnSuccess = function()
     end
 
     -- ============================================================
-    -- AUTO SKILL CHECK (UPGRADED)
+    -- AUTO SKILL CHECK (v3 — SUCCESS / NEUTRAL / INSTANT + KING SCOURGE)
     -- ============================================================
     local TouchID        = 8822
     local ActionPath     = "Survivor-mob.Controls.action.check"
@@ -1229,6 +1381,22 @@ Onyx.Callbacks.OnSuccess = function()
 
     local GuiService = game:GetService("GuiService")
     local LastTriggerTick = 0
+
+    -- King Scourge remotes (skillcheck v3)
+    local KingScourgeStart, KingScourgeEnd
+    pcall(function()
+        local KillerPerks = ReplicatedStorage:FindFirstChild("Remotes")
+            and ReplicatedStorage.Remotes:FindFirstChild("KillerPerks")
+        if KillerPerks then
+            local KingScourge = KillerPerks:FindFirstChild("kingscourge")
+            if KingScourge then
+                KingScourgeStart = KingScourge:FindFirstChild("KingScourgeStart")
+                KingScourgeEnd   = KingScourge:FindFirstChild("KingScourgeEnd")
+            end
+        end
+    end)
+
+    local ScourgeActive = false
 
     -- PressSkill — 40%.txt path + firesignal + VIM touch + Space
     local ActionPath = "Survivor-mob.Controls.action.check"
@@ -1313,7 +1481,36 @@ Onyx.Callbacks.OnSuccess = function()
         return nil, nil
     end
 
-    local LastGoalRotation = 0
+    -- Skill check v3: SUCCESS zone (102-116), NEUTRAL (116-159), INSTANT (109)
+    local SUCCESS_MIN, SUCCESS_MAX = 102, 116
+    local NEUTRAL_MIN, NEUTRAL_MAX = 116, 159
+    local LastGoalRotation = nil
+    local PreviousVisible = false
+
+    local function IsInZone(lr, gr, minOff, maxOff)
+        local lo = (gr + minOff) % 360
+        local hi = (gr + maxOff) % 360
+        if lo <= hi then
+            return lr >= lo and lr <= hi
+        end
+        return lr >= lo or lr <= hi
+    end
+
+    local function DoTrigger()
+        StateSkill.busy = true
+        task.spawn(function()
+            PressSkill()
+            task.wait(0.07)
+            StateSkill.busy = false
+        end)
+    end
+
+    -- INSTANT: set Line ke tengah SUCCESS (109°) lalu trigger
+    local function InstantTrigger(line, goal)
+        if not line or not goal then return end
+        line.Rotation = (goal.Rotation or 0) + 109
+        DoTrigger()
+    end
 
     local function startSkillCheck()
         if ConnectionsSkill.SkillHeartbeat then ConnectionsSkill.SkillHeartbeat:Disconnect() end
@@ -1326,47 +1523,76 @@ Onyx.Callbacks.OnSuccess = function()
             local lr = (line.Rotation or 0) % 360
             local gr = (goal.Rotation or 0) % 360
 
-            if VD.AutoSkillcheckMode == "Instant" then
-                line.Rotation = goal.Rotation + 109
-                StateSkill.busy = true
-                task.spawn(function()
-                    PressSkill()
-                    task.wait(0.2)
-                    StateSkill.busy = false
-                end)
-            else
-                -- Quantum dynamic offset based on goal velocity
-                local goalVelocity = math.abs(gr - LastGoalRotation)
-                LastGoalRotation = gr
-                local dynamicOffset = math.clamp(goalVelocity * 0.35, 0, 8)
+            local mode = VD.AutoSkillcheckMode or "Legit"
+            local visible = line.Visible or goal.Visible
 
-                local startRange, endRange
-                if VD.AutoSkillcheckMode == "Normal" then
-                    startRange = (gr + 116 - dynamicOffset) % 360
-                    endRange   = (gr + 140 + dynamicOffset) % 360
-                else -- Legit
-                    startRange = (gr + 102 - dynamicOffset) % 360
-                    endRange   = (gr + 116 + dynamicOffset) % 360
+            -- INSTANT: langsung set Line + trigger (normal & scourge)
+            if mode == "Instant" then
+                if visible then
+                    InstantTrigger(line, goal)
                 end
+                return
+            end
 
-                local inZone
-                if startRange > endRange then
-                    inZone = (lr >= startRange or lr <= endRange)
-                else
-                    inZone = (lr >= startRange and lr <= endRange)
-                end
-                if inZone then
-                    StateSkill.busy = true
-                    task.spawn(function()
-                        PressSkill()
-                        task.wait(0.05)
-                        StateSkill.busy = false
-                    end)
-                end
+            -- SUCCESS / NEUTRAL: trigger pas Line masuk zona
+            local inZone
+            if mode == "Neutral" then
+                inZone = IsInZone(lr, gr, NEUTRAL_MIN, NEUTRAL_MAX)
+            else -- Legit = SUCCESS
+                inZone = IsInZone(lr, gr, SUCCESS_MIN, SUCCESS_MAX)
+            end
+
+            if inZone then
+                DoTrigger()
             end
         end)
     end
+
+    -- King Scourge: begitu round mulai, INSTANT langsung set Line
+    if KingScourgeStart then
+        KingScourgeStart.OnClientEvent:Connect(function()
+            ScourgeActive = true
+            task.defer(function()
+                if VD.AutoSkillcheck and (VD.AutoSkillcheckMode or "Legit") == "Instant" then
+                    local line, goal = GetSkillCheck()
+                    InstantTrigger(line, goal)
+                end
+            end)
+        end)
+    end
+    if KingScourgeEnd then
+        KingScourgeEnd.OnClientEvent:Connect(function()
+            ScourgeActive = false
+        end)
+    end
+
+    -- Goal change detector — penting untuk KingScourge: setelah action,
+    -- Goal berubah ke round berikutnya tanpa Visible jadi false
+    local function goalChangeLoop()
+        while task.wait(0.005) do
+            if not (VD.AutoSkillcheck and ScourgeActive and (VD.AutoSkillcheckMode or "Legit") == "Instant") then
+                LastGoalRotation = nil
+                continue
+            end
+            local line, goal = GetSkillCheck()
+            if not (line and goal) then continue end
+            local gr = (goal.Rotation or 0) % 360
+            if LastGoalRotation == nil then
+                LastGoalRotation = gr
+            elseif math.abs(gr - LastGoalRotation) > 1 then
+                LastGoalRotation = gr
+                InstantTrigger(line, goal)
+            end
+        end
+    end
+    task.spawn(goalChangeLoop)
+
     if VD.AutoSkillcheck then startSkillCheck() end
+
+    -- Init namecall hook kalau salah satu fitur sudah aktif
+    if VD.UnlockSkillsCarry or VD.DoubleDamageGen then
+        SetupUnlockSkillsCarry()
+    end
 
     -- ============================================================
     -- AUTO PARRY
@@ -2868,7 +3094,7 @@ Onyx.Callbacks.OnSuccess = function()
     })
     secSkill:AddDropdown({ 
         Text = "Mode",
-        Options = {"Legit", "Instant"},
+        Options = {"Legit", "Neutral", "Instant"},
         Default = VD.AutoSkillcheckMode,
         Callback = function(v) VD.AutoSkillcheckMode = v end,
         Flag = "SkillCheckMode",
@@ -3113,6 +3339,33 @@ Onyx.Callbacks.OnSuccess = function()
         Icon = "solar/refresh-bold",
         Callback = function() updateESP(); Notify("ESP", "Refreshed", "success", 2) end
     })
+    secESP:AddToggle({
+        Text = "Hide Name (Player)",
+        Default = VD.HideName,
+        Tooltip = "Sembunyikan nama player di atas kepala",
+        Flag = "HideName",
+        Callback = function(v)
+            VD.HideName = v
+            applyHideName()
+            Notify("Hide Name", v and "ON" or "OFF", v and "success" or "info", 2)
+        end,
+    })
+
+    local secTPGen = mkSec(tabESP, "Teleport", "Lucide:map-pin")
+    secTPGen:AddButton({
+        Text = "TP Generator (Loop)",
+        Callback = function()
+            TeleportToGenerator()
+        end,
+    })
+    secTPGen:AddButton({
+        Text = "Reset TP Index",
+        Callback = function()
+            VD.TeleportGenIndex = 1
+            refreshGenCache()
+            Notify("TP Generator", "Cache refresh, index reset", "info", 2)
+        end,
+    })
 
     -- Color Pickers
     local secESPColor = mkSec(tabESP, "ESP Colors", "Lucide:palette")
@@ -3341,7 +3594,7 @@ Onyx.Callbacks.OnSuccess = function()
         Options = {"Killer", "Survivor", "SCP"},
         Default = VD.Pistol_Target,
         Callback = function(v) 
-            VD.Pistol_Target = v[1]
+            VD.Pistol_Target = type(v) == "table" and v[1] or v
         end,
         Flag = "SA_Target",
     })
@@ -3575,7 +3828,7 @@ Onyx.Callbacks.OnSuccess = function()
     local function onCharacterAdded(player)
         player.CharacterAdded:Connect(function()
             task.wait(0.5)
-            if VD.ESP_Enabled then updateESP() end
+            updateESP()
         end)
     end
 
@@ -3588,13 +3841,13 @@ Onyx.Callbacks.OnSuccess = function()
     end)
 
     Players.PlayerRemoving:Connect(function()
-        if VD.ESP_Enabled then task.wait(0.1); updateESP() end
+        task.wait(0.1); updateESP()
     end)
 
     task.spawn(function()
         while RunService:IsRunning() do
             task.wait(2)
-            if VD.ESP_Enabled then updateESP() end
+            updateESP()
         end
     end)
 
