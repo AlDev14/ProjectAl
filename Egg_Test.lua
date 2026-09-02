@@ -611,11 +611,6 @@ local function runAutoPlace()
                 uid = rec.Uid
             end
             if type(k) ~= "string" then continue end
-            -- Placement = sudah di-plot, skip
-            if rec.Placement ~= nil then
-                skippedPlacement += 1
-                continue
-            end
 
             if processed >= MAX_PER_RUN then break end
             processed += 1
