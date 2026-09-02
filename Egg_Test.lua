@@ -668,21 +668,23 @@ local function runAutoPlace()
         local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
         local skippedPlacement = 0
-        local processed = 0
-        local MAX_PER_RUN = 5 -- batasi 5 dulu buat debug
+        local MAX_PER_RUN = 10
 
-        -- Handle dua format: dict {[uid]=rec} atau array {[1]={Uid=uid,...}}
         for k, rec in pairs(owned) do
+            if placed >= MAX_PER_RUN then break end
             local uid
             if type(k) == "string" then
                 uid = k
             elseif type(rec) == "table" and rec.Uid then
                 uid = rec.Uid
             end
-            if type(k) ~= "string" then continue end
+            if not uid or type(k) ~= "string" then continue end
 
-            if processed >= MAX_PER_RUN then break end
-            processed += 1
+            -- Skip yang sudah di-place
+            if rec.Placement ~= nil then
+                skippedPlacement += 1
+                continue
+            end
 
             -- Filter rarity
             if minRarNum > 0 then
@@ -691,6 +693,10 @@ local function runAutoPlace()
                     rarNum = rec.Rarity.RarityNumber or 0
                 elseif rec.RarityNumber and type(rec.RarityNumber) == "number" then
                     rarNum = rec.RarityNumber
+                end
+                -- Debug rarity sekali
+                if rarNum == 0 then
+                    -- print("[AutoPlace] rarity unknown for uid:", uid:sub(1,8), "rec.Rarity:", type(rec.Rarity))
                 end
                 if rarNum > 0 and rarNum < minRarNum then continue end
             end
