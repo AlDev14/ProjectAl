@@ -880,7 +880,7 @@ local VindUI
 do
     local ok, r = pcall(function()
         return loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/Skinny-yz/VVind-UI/refs/heads/main/src.lua"
+            "https://cdn.jsdelivr.net/gh/Skinny-yz/VVind-UI@main/src.lua"
         ))()
     end)
     if ok and r then VindUI = r
