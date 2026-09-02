@@ -511,8 +511,16 @@ local function runAutoPlace()
 
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
         if not ok or type(owned) ~= "table" or #owned == 0 then
-            print("[AutoPlace] owned egg kosong:", ok, type(owned))
+            print("[AutoPlace] owned egg kosong:", ok, type(owned), #(owned or {}))
             return
+        end
+
+        -- Debug: print field pertama owned egg biar tau format
+        if owned[1] then
+            print("[AutoPlace] record sample fields:")
+            for k, v in pairs(owned[1]) do
+                print("  ." .. tostring(k) .. " = " .. tostring(type(v) == "table" and "{table}" or v))
+            end
         end
 
         local minRarNum = getRarityNumberByName(State.placeMinRarity)
