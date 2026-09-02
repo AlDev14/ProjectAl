@@ -873,8 +873,144 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO PLACE PET — scan Backpack ItemType=Asset, pindah ke Character
+-- ANTI-STUCK TREADMILL — jump kalau posisi gak berubah saat farm aktif
 -- ============================================================
+task.spawn(function()
+    local lastPos = Vector3.new(0,0,0)
+    local stuckTimer = 0
+    while true do
+        task.wait(1)
+        if not State.running then stuckTimer = 0; continue end
+        local r = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not r then continue end
+        local dist = (r.Position - lastPos).Magnitude
+        if dist < 1.5 then
+            stuckTimer += 1
+            if stuckTimer >= 3 then
+                -- Kemungkinan nyangkut di treadmill — paksa jump
+                local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if h then h.Jump = true end
+                stuckTimer = 0
+                print("[AntiStuck] jump triggered")
+            end
+        else
+            stuckTimer = 0
+        end
+        lastPos = r.Position
+    end
+end)
+
+-- ============================================================
+-- CYCLE PANEL — countdown 5 menit + egg field rarity
+-- ============================================================
+local _cycleGui = Instance.new("ScreenGui")
+_cycleGui.Name = "SAE_CyclePanel"
+_cycleGui.ResetOnSpawn = false
+_cycleGui.IgnoreGuiInset = true
+_cycleGui.DisplayOrder = 99997
+_cycleGui.Enabled = false
+_cycleGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local _cycleFrame = Instance.new("Frame")
+_cycleFrame.Size = UDim2.fromOffset(180, 200)
+_cycleFrame.Position = UDim2.new(1, -190, 0, 50)
+_cycleFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+_cycleFrame.BackgroundTransparency = 0.1
+_cycleFrame.BorderSizePixel = 0
+_cycleFrame.Parent = _cycleGui
+Instance.new("UICorner", _cycleFrame).CornerRadius = UDim.new(0, 8)
+
+local _cycleTitle = Instance.new("TextLabel")
+_cycleTitle.Size = UDim2.new(1, 0, 0, 24)
+_cycleTitle.Position = UDim2.new(0,0,0,0)
+_cycleTitle.BackgroundTransparency = 1
+_cycleTitle.Text = "CYCLE TIMER"
+_cycleTitle.TextColor3 = Color3.fromRGB(180,180,200)
+_cycleTitle.TextSize = 11
+_cycleTitle.Font = Enum.Font.GothamBold
+_cycleTitle.Parent = _cycleFrame
+
+local _cycleTimer = Instance.new("TextLabel")
+_cycleTimer.Size = UDim2.new(1, 0, 0, 30)
+_cycleTimer.Position = UDim2.new(0,0,0,24)
+_cycleTimer.BackgroundTransparency = 1
+_cycleTimer.Text = "5:00"
+_cycleTimer.TextColor3 = Color3.fromRGB(100, 220, 100)
+_cycleTimer.TextSize = 22
+_cycleTimer.Font = Enum.Font.GothamBold
+_cycleTimer.Parent = _cycleFrame
+
+local _cycleList = Instance.new("Frame")
+_cycleList.Size = UDim2.new(1, -8, 0, 140)
+_cycleList.Position = UDim2.new(0,4,0,58)
+_cycleList.BackgroundTransparency = 1
+_cycleList.Parent = _cycleFrame
+local _cycleListLayout = Instance.new("UIListLayout")
+_cycleListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+_cycleListLayout.Padding = UDim.new(0,2)
+_cycleListLayout.Parent = _cycleList
+
+local RARITY_COLORS = {
+    Common="#b0b0b0", Uncommon="#5abf5a", Rare="#4a90d9", Epic="#a64fd6",
+    Legendary="#f5a623", Mythic="#e74c3c", Divine="#00e5ff", Otherworldly="#ff6ec7",
+    Celestial="#ffe066", Transcendent="#ff9f43", Void="#8e44ad",
+    Eternal="#1abc9c", Cosmic="#e056fd", Prismatic="#fd79a8",
+    Spectral="#74b9ff", Ethereal="#a29bfe", Astral="#55efc4",
+    Radiant="#ffeaa7", Sovereign="#fdcb6e", Omnipotent="#e17055", Exclusive="#ff7675",
+}
+local function rarityColor(name)
+    local hex = RARITY_COLORS[name] or "#ffffff"
+    local r,g,b = hex:match("#(%x%x)(%x%x)(%x%x)")
+    if r then return Color3.fromRGB(tonumber(r,16),tonumber(g,16),tonumber(b,16)) end
+    return Color3.new(1,1,1)
+end
+
+local _cycleStart = tick()
+local CYCLE_DURATION = 300 -- 5 menit
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not _cycleGui.Enabled then continue end
+
+        -- Update timer
+        local elapsed = (tick() - _cycleStart) % CYCLE_DURATION
+        local remaining = CYCLE_DURATION - elapsed
+        local mins = math.floor(remaining / 60)
+        local secs = math.floor(remaining % 60)
+        _cycleTimer.Text = string.format("%d:%02d", mins, secs)
+        -- Warna merah kalau < 30 detik (blackout segera)
+        _cycleTimer.TextColor3 = remaining < 30
+            and Color3.fromRGB(220, 80, 80)
+            or Color3.fromRGB(100, 220, 100)
+
+        -- Update egg list dari EggState
+        for _, c in ipairs(_cycleList:GetChildren()) do
+            if c:IsA("TextLabel") then c:Destroy() end
+        end
+        if EggState and EggState.ReadFieldEggs then
+            local ok, fieldData = pcall(function() return EggState.ReadFieldEggs() end)
+            if ok and fieldData and fieldData.Records then
+                local shown = 0
+                for _, rec in ipairs(fieldData.Records) do
+                    if shown >= 8 then break end
+                    local rarName = getRarityName(rec)
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1, 0, 0, 16)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = (rec.AssetCategory or "?").." ["..rarName.."]"
+                    lbl.TextColor3 = rarityColor(rarName)
+                    lbl.TextSize = 10
+                    lbl.Font = Enum.Font.Gotham
+                    lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.LayoutOrder = shown
+                    lbl.Parent = _cycleList
+                    shown += 1
+                end
+            end
+        end
+    end
+end)
 local function runAutoPlacePet()
     if not PlotState then loadModules() end
     if not PlotState then return end
@@ -2223,6 +2359,13 @@ grpMisc:AddToggle("ReduceMap", {
     Default = false,
     Tooltip = "Hide non-essential parts untuk FPS",
     Callback = function(v) State.reducedMap = v; setReduceMap(v) end,
+})
+
+grpMisc:AddToggle("ShowCyclePanel", {
+    Text    = "Cycle Panel",
+    Default = false,
+    Tooltip = "Countdown 5 menit + list egg di field (pojok kanan atas)",
+    Callback = function(v) _cycleGui.Enabled = v end,
 })
 
 local grpMisc2 = Tabs.Misc:AddRightGroupbox("Utility")
