@@ -52,7 +52,8 @@ local function loadModules()
     Assets              = tryRequire("Data.Assets",      "Shared.Assets", "Assets")
     RarityModule        = tryRequire("Data.Rarity",      "Shared.Rarity", "Rarity")
     AreaEggSlotIdentity = tryRequire("Shared.Util.AreaEggSlotIdentity", "Util.AreaEggSlotIdentity")
-    GameRemotes         = tryRequire("Shared.Remotes",   "Remotes")
+    -- GameRemotes sengaja dihapus — require(Shared.Remotes) = BAC di SAE
+    -- Semua remote diakses langsung via Packages.Networking
     ModulesLoaded       = EggState ~= nil and PlotState ~= nil
     return ModulesLoaded
 end
@@ -93,8 +94,8 @@ local State = {
     espEnabled        = false,
 }
 
--- Base teleport koordinat
-local START_POS = Vector3.new(547.89, 70.58, -357.39)
+-- Base teleport koordinat (dari koedinat panel)
+local START_POS = Vector3.new(519.464, 70.576, -370.816)
 
 -- ============================================================
 -- HELPERS
@@ -396,33 +397,41 @@ local function runAutoPlace()
         local myPlot = PlotState.ResolvePlot()
         if not myPlot or not myPlot.CenterPoint or not myPlot.PetArea then return end
 
+        -- Walk ke plot dulu — server validasi player harus dalam bounds
+        local plotPos = myPlot.CenterPoint.Position
+        local r = root()
+        if r and (r.Position - plotPos).Magnitude > 5 then
+            walkTo(plotPos, 15, true)
+        end
+
+        -- Tunggu sebentar biar bounds check server pass
+        task.wait(0.2)
+
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        local placeRemote = net and net:FindFirstChild("RF/EggWorld/AskPlaceEgg")
+        if not placeRemote then return end
+
+        -- LocalCFrame = posisi PetArea relatif ke CenterPoint
         local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(
             CFrame.new(myPlot.PetArea.Position)
         )
-        local placeRemote = ReplicatedStorage:FindFirstChild("Packages")
-            and ReplicatedStorage.Packages:FindFirstChild("Networking")
-            and ReplicatedStorage.Packages.Networking:FindFirstChild("RF/EggWorld/AskPlaceEgg")
 
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
         if not ok or type(owned) ~= "table" or #owned == 0 then return end
 
         local minRarNum = getRarityNumberByName(State.placeMinRarity)
+        local placed, skipped = 0, 0
 
         for _, rec in ipairs(owned) do
             if not rec.Uid then continue end
-            -- Filter rarity place
-            if minRarNum > 0 and getRarityNumber(rec) < minRarNum then continue end
-
-            local placed = false
-            if placeRemote then
-                local ok3, res = pcall(function()
-                    return placeRemote:InvokeServer({ Uid = rec.Uid, LocalCFrame = localCFrame })
-                end)
-                placed = ok3 and res == true
+            if minRarNum > 0 and getRarityNumber(rec) < minRarNum then
+                skipped += 1; continue
             end
-            if not placed then
-                pcall(function() EggState.PlantEgg(rec.Uid, localCFrame) end)
-            end
+            local ok3, res = pcall(function()
+                return placeRemote:InvokeServer({ Uid = rec.Uid, LocalCFrame = localCFrame })
+            end)
+            if ok3 and res == true then placed += 1 end
             task.wait(0.05)
         end
     end)
