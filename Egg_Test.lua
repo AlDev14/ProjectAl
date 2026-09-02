@@ -1749,11 +1749,28 @@ end)
 -- OBSIDIAN UI
 -- ============================================================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local Library     = loadstring(game:HttpGet(repo .. "Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+local Library, ThemeManager, SaveManager
 
-if not Library then warn("[SAE] Obsidian gagal load"); return end
+do
+    local ok, r = pcall(function()
+        local L = loadstring(game:HttpGet(repo .. "Library.lua"))
+        assert(L, "Library.lua compile failed")
+        local lib = L()
+        assert(lib, "Library.lua returned nil")
+        local TM = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))
+        local SM = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))
+        return lib, TM and TM() or {}, SM and SM() or {}
+    end)
+    if ok and r then
+        Library, ThemeManager, SaveManager = r[1] or r, r[2] or {}, r[3] or {}
+    end
+    if not ok then warn("[SAE] Obsidian error:", tostring(r)) end
+end
+
+if not Library then
+    warn("[SAE] Obsidian gagal load — UI tidak muncul")
+    return
+end
 
 local function Notify(title, text, dur)
     pcall(function()
