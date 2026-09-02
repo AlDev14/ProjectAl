@@ -596,32 +596,48 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO SELL — independent loop
+-- AUTO SELL — AskWearTool + getnilinstances + ToolTrigger
+-- Confirmed dari rspy SAE KONTOL.txt
 -- ============================================================
--- Auto Sell via PetSatchel.SellPet / SellEveryPet (confirmed Shared.Remotes decompile)
-local function getSellRemote(name)
-    local net = ReplicatedStorage:FindFirstChild("Packages")
-        and ReplicatedStorage.Packages:FindFirstChild("Networking")
-    return net and net:FindFirstChild("RE/PetSatchel/" .. name)
+local function getToolFromNil(name)
+    if type(getnilinstances) ~= "function" then return nil end
+    local ok, result = pcall(function()
+        for _, obj in ipairs(getnilinstances()) do
+            if obj:IsA("Tool") and obj.Name == name then
+                return obj
+            end
+        end
+        return nil
+    end)
+    return ok and result or nil
 end
 
 local function runAutoSell()
     pcall(function()
-        -- Sell All (pet mode)
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+
+        -- Sell All pets
         if State.sellAll then
-            local remote = getSellRemote("SellEveryPet")
+            local remote = net:FindFirstChild("RE/PetSatchel/SellEveryPet")
             if remote then
                 remote:FireServer()
                 print("[AutoSell] SellEveryPet fired")
-            else
-                warn("[AutoSell] SellEveryPet remote not found")
             end
             return
         end
 
-        -- Sell per egg by rarity filter
         if not EggState then loadModules() end
         if not EggState then warn("[AutoSell] EggState nil"); return end
+
+        local wearRemote    = net:FindFirstChild("RF/EggWorld/AskWearTool")
+        local triggerRemote = net:FindFirstChild("RE/ToolTrigger/Trigger")
+        if not wearRemote or not triggerRemote then
+            warn("[AutoSell] remote missing — wearTool:" .. tostring(wearRemote ~= nil) ..
+                 " trigger:" .. tostring(triggerRemote ~= nil))
+            return
+        end
 
         local maxNum = getRarityNumberByName(State.sellMaxRarity)
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
@@ -630,25 +646,45 @@ local function runAutoSell()
             return
         end
 
-        local remote = getSellRemote("SellPet")
-        if not remote then
-            warn("[AutoSell] SellPet remote not found")
-            return
-        end
-
         local sold, skipped = 0, 0
         for _, rec in ipairs(owned) do
             if not rec.Uid then continue end
             local rarNum = getRarityNumber(rec)
-            if rarNum <= maxNum then
-                pcall(function() remote:FireServer({rec.Uid}) end)
-                sold += 1
-                task.wait(0.05)
-            else
-                skipped += 1
+            if rarNum > maxNum then skipped += 1; continue end
+
+            -- 1. Equip egg via AskWearTool
+            local ok2, toolName = pcall(function()
+                return wearRemote:InvokeServer(rec.Uid)
+            end)
+
+            task.wait(0.2)
+
+            -- 2. Cari tool di nil instances (egg masuk nil setelah equip)
+            local eggName = rec.AssetCategory or rec.DisplayName
+                or (rec.Rarity and rec._id) or tostring(rec.Uid)
+
+            local tool = nil
+            -- Cari di nil instances
+            tool = getToolFromNil(eggName)
+            -- Fallback: scan character
+            if not tool then
+                local char = LocalPlayer.Character
+                if char then
+                    tool = char:FindFirstChildOfClass("Tool")
+                end
             end
+
+            if tool then
+                -- 3. Trigger sell via ToolTrigger
+                pcall(function() triggerRemote:FireServer(tool) end)
+                sold += 1
+                print("[AutoSell] sold: " .. tostring(eggName))
+            else
+                warn("[AutoSell] tool not found for: " .. tostring(eggName))
+            end
+            task.wait(0.3)
         end
-        print(string.format("[AutoSell] sold=%d skipped=%d (maxRarity=%s)", sold, skipped, State.sellMaxRarity))
+        print(string.format("[AutoSell] sold=%d skipped=%d", sold, skipped))
     end)
 end
 
