@@ -1574,7 +1574,6 @@ local function farmCycle()
         if not r then return end
         local dist = (r.Position - part.Position).Magnitude
         if dist > 8 then
-            -- Terlalu jauh (kena hit), skip egg ini
             State.lockedRecord = nil
             return
         end
@@ -1586,20 +1585,32 @@ local function farmCycle()
             end
         end)
 
-        for _ = 1, 3 do -- retry 3x
+        -- Claim cepat — instant interact sudah handle hold duration
+        for _ = 1, 5 do
             pcall(function() EggState.CarryFieldEgg(rec.Uid, slotKey) end)
             local prompt = model:FindFirstChild("CarryAreaEgg", true)
                 or model:FindFirstChildWhichIsA("ProximityPrompt", true)
             if prompt then
                 pcall(function()
                     prompt.Enabled = true
+                    prompt.HoldDuration = 0 -- force instant
                     if typeof(fireproximityprompt) == "function" then
                         fireproximityprompt(prompt, 0)
                     end
                 end)
             end
-            task.wait(0.05)
+            -- Cek apakah sudah carrying (egg di karakter = berhasil)
+            local char = LocalPlayer.Character
+            if char then
+                for _, t in ipairs(char:GetChildren()) do
+                    if t:IsA("Tool") and (t:GetAttribute("ItemType") == "AssetEgg" or AREA_SET[t.Name]) then
+                        goto claimDone
+                    end
+                end
+            end
+            task.wait(0.02)
         end
+        ::claimDone::
         State.lockedRecord = nil
 
         -- 4. Kembali ke base (walkTo normal, tanpa snap)
