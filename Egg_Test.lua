@@ -299,11 +299,13 @@ end)
 
 -- ============================================================
 -- FLOAT SYSTEM — client-side visual only (RenderStepped)
--- Cuma lo yang lihat, tidak mempengaruhi physics/server
+-- Smooth Y biar gak jumping, cuma lo yang lihat
 -- ============================================================
 local _floatConn = nil
+local _floatSmoothY = nil
 local function updateFloat()
     if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
+    _floatSmoothY = nil
     if not State.floatEnabled then return end
     _floatConn = RunService.RenderStepped:Connect(function()
         if not State.floatEnabled then return end
@@ -311,47 +313,51 @@ local function updateFloat()
         if not c then return end
         local hrp = c:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-        -- Geser Y ke atas secara visual (client-only, sebelum render)
-        hrp.CFrame = hrp.CFrame + Vector3.new(0, State.floatHeight, 0)
+        -- Smooth Y dari physics position biar gak jumpy
+        local physY = hrp.Position.Y
+        if not _floatSmoothY then _floatSmoothY = physY end
+        _floatSmoothY = _floatSmoothY * 0.85 + physY * 0.15
+        -- Apply offset visual-only
+        local rot = hrp.CFrame - hrp.CFrame.Position
+        hrp.CFrame = CFrame.new(hrp.Position.X, _floatSmoothY + State.floatHeight, hrp.Position.Z) * rot
     end)
 end
 
 -- ============================================================
--- ANIMATION TOGGLE
+-- ANIMATION TOGGLE — Heartbeat loop biar gak re-apply
 -- ============================================================
 local _animTracks = {}
+local _animConn   = nil
+
 local function stopAllAnims()
     local c = LocalPlayer.Character
     if not c then return end
     local hum = c:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-        track:Stop(0)
-        table.insert(_animTracks, track)
-    end
-    -- Animator juga
     local animator = hum:FindFirstChildOfClass("Animator")
     if animator then
         for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-            track:Stop(0)
-            table.insert(_animTracks, track)
+            pcall(function() track:Stop(0) end)
         end
     end
-end
-
-local function resumeAllAnims()
-    for _, track in ipairs(_animTracks) do
-        pcall(function() track:Play() end)
+    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+        pcall(function() track:Stop(0) end)
     end
-    _animTracks = {}
 end
 
 local function updateAnim()
-    if State.animEnabled then
-        resumeAllAnims()
-    else
+    if _animConn then _animConn:Disconnect(); _animConn = nil end
+    if State.animEnabled then return end
+    -- Stop sekali dulu
+    stopAllAnims()
+    -- Loop terus stop animasi baru yang di-apply game
+    _animConn = RunService.Heartbeat:Connect(function()
+        if State.animEnabled then
+            if _animConn then _animConn:Disconnect(); _animConn = nil end
+            return
+        end
         stopAllAnims()
-    end
+    end)
 end
 -- ============================================================
 local function walkTo(goal, timeout, isReturning)
