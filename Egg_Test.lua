@@ -1998,16 +1998,17 @@ grpVal:AddInput("MinEarning", {
     Text = "Min Earning Rate", Placeholder = "0 = off",
     Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
 })
-grpVal:AddSlider("MinWeight", {
-    Text = "Min Weight (kg)", Default = 0, Min = 0, Max = 10000, Rounding = 0,
-    Tooltip = "Skip egg di bawah weight ini (0 = off)",
-    Callback = function(v) State.minModelWeight = v end,
+grpVal:AddInput("MinWeightInp", {
+    Default = "0", Numeric = true, Finished = true,
+    Text = "Min Weight (kg)", Placeholder = "0 = off",
+    Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
 })
-grpVal:AddSlider("MaxWeight", {
-    Text = "Max Weight (kg)", Default = 0, Min = 0, Max = 100000, Rounding = 0,
-    Tooltip = "Skip egg di atas weight ini (0 = off)",
+grpVal:AddInput("MaxWeightInp", {
+    Default = "0", Numeric = true, Finished = true,
+    Text = "Max Weight (kg)", Placeholder = "0 = off",
     Callback = function(v)
-        State.maxModelWeight = v == 0 and 999999999 or v
+        local n = tonumber(v) or 0
+        State.maxModelWeight = n == 0 and 999999999 or n
     end,
 })
 
@@ -2103,20 +2104,19 @@ local grpMisc2 = Tabs.Misc:AddRightGroupbox("Utility")
 
 grpMisc2:AddToggle("AntiAfk", {
     Text    = "Anti AFK",
-    Default = false,
+    Default = true,
     Tooltip = "Prevent automatic kick",
     Callback = function(v) State.antiAfk = v; setAntiAfk(v) end,
 })
 
 grpMisc2:AddToggle("AntiStaff", {
     Text    = "Anti Staff",
-    Default = false,
+    Default = true,
     Tooltip = "Stop farm kalau ada staff di server",
     Callback = function(v)
         if v then
-            -- Monitor staff presence
             task.spawn(function()
-                while v and Toggles and Toggles.AntiStaff and Toggles.AntiStaff.Value do
+                while v do
                     for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
                         if p ~= LocalPlayer then
                             local badge = p:GetAttribute("IsStaff") or p:GetAttribute("Staff")
@@ -2162,6 +2162,18 @@ grpMisc2:AddButton({ Text = "Server Hop", Func = function()
     end)
 end })
 
+-- Keybind minimize UI (Windows: RightShift default)
+local grpKeybind = Tabs.Misc:AddLeftGroupbox("Keybind")
+grpKeybind:AddKeybind("MinimizeKey", {
+    Text    = "Toggle UI",
+    Default = "RightShift",
+    Callback = function(key)
+        pcall(function()
+            Window:SetToggleKey(Enum.KeyCode[key] or Enum.KeyCode.RightShift)
+        end)
+    end,
+})
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:SetFolder("SAE_Test")
@@ -2170,8 +2182,24 @@ ThemeManager:ApplyToTab(Tabs.Config)
 
 Notify("Steal An Egg", "v2.0 loaded!", 3)
 
--- Auto-aktif no knockback saat load
+-- Auto-aktif saat load
 task.spawn(function()
     task.wait(2)
-    applyNoKnockback()
+    applyNoKnockback()  -- anti knockback
+    setAntiAfk(true)    -- anti afk
+    -- anti staff loop
+    task.spawn(function()
+        while true do
+            for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local badge = p:GetAttribute("IsStaff") or p:GetAttribute("Staff")
+                    if badge then
+                        State.running = false
+                        Notify("Anti Staff", "Staff: "..p.Name, 5)
+                    end
+                end
+            end
+            task.wait(3)
+        end
+    end)
 end)
