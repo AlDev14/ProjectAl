@@ -104,20 +104,20 @@ local function hum()
 end
 
 -- ============================================================
--- EGG NAME LOOKUP BY RARITY (Source: IGN wiki + in-game)
--- Tool di Backpack = "[PetName] Egg"
+-- EGG NAME LOOKUP BY RARITY (Source: IGN wiki + in-game confirmed)
+-- Tool di Backpack = nama pet saja (tanpa " Egg")
 -- ============================================================
 local EGG_BY_RARITY = {
-    ["Common"]    = {"Chicken Egg","Dog Egg","Frog Egg","Duckling Egg","Jerboa Egg"},
-    ["Uncommon"]  = {"Bird Egg","Catfish Egg","Fennec Egg"},
-    ["Rare"]      = {"Owl Egg","Raccoon Egg","Turtle Egg","Camel Egg","Toucan Egg","Chimpanzee Egg","Penguin Egg","Lava Gecko Egg","Parrotfish Egg","Dodo Egg","Tung Tung Sahur Egg"},
-    ["Epic"]      = {"Bear Egg","Fox Egg","Trulimero Trulicina Egg","Swan Egg","Tob Tobi Tob Tob Egg","Crocodile Egg","Walrus Egg","Lava Frog Egg","Swordfish Egg","Centapede Egg","Crane Egg","Bananita Dolphinita Egg"},
-    ["Legendary"] = {"Brr Brr Patapim Egg","Axolotl Egg","Snake Egg","Gorilla Egg","Orangutini Ananassini Egg","Polar Bear Egg","Flaming Bull Egg","Lava Iguana Egg","Shark Egg","Pterodactyl Egg","Cosmic Gecko Egg","Salamander Egg","Crustacia Egg","Spideron Egg","Scorpio Egg","Mecha Scorpio Egg"},
-    ["Mythic"]    = {"Scorpion Egg","Sand Spider Egg","Spider Egg","Tiger Egg","Sabertooth Tiger Egg","Mammoth Egg","Chillin Chilli Egg","Orca Egg","Ankylosaurus Egg","Cosmic Gorilla Egg","Red Panda Egg","Bladehide Egg","Belula Beluga Egg","Froggo Egg","Mecha Froggo Egg"},
-    ["Divine"]    = {"Unicorn Egg","Kitsune Egg","Dreadscale Egg","Mecha Dreadscale Egg"},
-    ["Secret"]    = {"King Snake Egg","Yeti Egg","Cerberus Egg","Kraken Egg","Tralaledon Egg","TRex Egg","Cosmic Dragon Egg","Cosmic Skeleton Boss Egg","Stag Egg","Mutant Shark Egg","Bomboclat Crocolat Egg","Crocodon Egg","Mecha Crocodon Egg"},
-    ["Cosmic"]    = {"Leviathan Egg","Royal Sphinx Egg","King Mammoth Egg","Whale Shark Egg","Beluga Whale Egg","Triceratops Egg","Bronto Egg","Mosasaurus Egg","Koi Egg","Snowy Owl Egg","Mantaris Egg","Rhinotaur Egg","Mangolini Parrochini Egg","Crawler Egg","Mecha Crawler Egg"},
-    ["Eternal"]   = {"Ice Dragon Egg","Phoenix Egg","Lava Dragon Egg","El Maja Egg","Eternal Lunar Dragon Egg","Oni Tiger Egg","Gorilla King Egg","Strawberry Elephant Egg","Krakenoid Egg","Mecha Krakenoid Egg"},
+    ["Common"]    = {"Chicken","Dog","Frog","Duckling","Jerboa"},
+    ["Uncommon"]  = {"Bird","Catfish","Fennec"},
+    ["Rare"]      = {"Owl","Raccoon","Turtle","Camel","Toucan","Chimpanzee","Penguin","Lava Gecko","Parrotfish","Dodo","Tung Tung Sahur"},
+    ["Epic"]      = {"Bear","Fox","Trulimero Trulicina","Swan","Tob Tobi Tob Tob","Crocodile","Walrus","Lava Frog","Swordfish","Centapede","Crane","Bananita Dolphinita"},
+    ["Legendary"] = {"Brr Brr Patapim","Axolotl","Snake","Gorilla","Orangutini Ananassini","Polar Bear","Flaming Bull","Lava Iguana","Shark","Pterodactyl","Cosmic Gecko","Salamander","Crustacia","Spideron","Scorpio","Mecha Scorpio"},
+    ["Mythic"]    = {"Scorpion","Sand Spider","Spider","Tiger","Sabertooth Tiger","Mammoth","Chillin Chilli","Orca","Ankylosaurus","Cosmic Gorilla","Red Panda","Bladehide","Belula Beluga","Froggo","Mecha Froggo"},
+    ["Divine"]    = {"Unicorn","Kitsune","Dreadscale","Mecha Dreadscale"},
+    ["Secret"]    = {"King Snake","Yeti","Cerberus","Kraken","Tralaledon","TRex","Cosmic Dragon","Cosmic Skeleton Boss","Stag","Mutant Shark","Bomboclat Crocolat","Crocodon","Mecha Crocodon"},
+    ["Cosmic"]    = {"Leviathan","Royal Sphinx","King Mammoth","Whale Shark","Beluga Whale","Triceratops","Bronto","Mosasaurus","Koi","Snowy Owl","Mantaris","Rhinotaur","Mangolini Parrochini","Crawler","Mecha Crawler"},
+    ["Eternal"]   = {"Ice Dragon","Phoenix","Lava Dragon","El Maja","Eternal Lunar Dragon","Oni Tiger","Gorilla King","Strawberry Elephant","Krakenoid","Mecha Krakenoid"},
 }
 
 -- Flat reverse: eggName → rarity
@@ -563,47 +563,50 @@ local function runAutoPlace()
 
         local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
 
-        -- Scan backpack
+        -- Scan backpack + cross-reference dengan EggState buat dapat Uid
         local eggs = getEggsFromBackpack(State.placeMinRarity == "All" and "" or State.placeMinRarity)
         if #eggs == 0 then
-            -- Fallback ke EggState
-            if EggState then
+            print("[AutoPlace] tidak ada egg di backpack yang lolos filter")
+            return
+        end
+
+        -- Ambil owned records buat cross-reference Uid via AssetCategory
+        local uidMap = {} -- {toolName → uid}
+        if EggState then
+            pcall(function()
                 local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
                 if ok and type(owned) == "table" then
                     for _, rec in ipairs(owned) do
-                        if not rec.Uid then continue end
-                        if wearRemote then
-                            pcall(function() wearRemote:InvokeServer(rec.Uid) end)
-                            task.wait(0.2)
+                        if rec.Uid and rec.AssetCategory then
+                            uidMap[rec.AssetCategory] = rec.Uid
                         end
-                        local ok3, res = pcall(function()
-                            return placeRemote:InvokeServer({Uid=rec.Uid, LocalCFrame=localCFrame})
-                        end)
-                        if ok3 and res then print("[AutoPlace] placed (EggState):", rec.Uid) end
-                        task.wait(0.1)
                     end
                 end
-            end
-            return
+            end)
         end
 
         local placed = 0
         for _, egg in ipairs(eggs) do
-            -- Equip dulu: pindah tool ke Character
-            pcall(function()
-                egg.tool.Parent = LocalPlayer.Character
-            end)
+            -- Equip: pindah tool ke Character
+            pcall(function() egg.tool.Parent = LocalPlayer.Character end)
             task.wait(0.15)
 
-            -- Place
+            -- Cari uid — dari EggState cross-ref, atau attribute tool
+            local uid = uidMap[egg.name]
+                or egg.tool:GetAttribute("Uid")
+                or egg.tool:GetAttribute("uid")
+                or egg.name  -- fallback nama
+
             local ok3, res = pcall(function()
-                return placeRemote:InvokeServer({Uid = egg.tool:GetAttribute("Uid") or egg.name, LocalCFrame = localCFrame})
+                return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
             end)
             if ok3 and res then
                 placed += 1
-                print("[AutoPlace] placed:", egg.name)
+                print("[AutoPlace] placed:", egg.name, "uid:", tostring(uid))
             else
                 warn("[AutoPlace] failed:", egg.name, tostring(res))
+                -- Kembalikan tool ke backpack kalau gagal
+                pcall(function() egg.tool.Parent = LocalPlayer.Backpack end)
             end
             task.wait(0.1)
         end
