@@ -1113,8 +1113,6 @@ task.spawn(function()
     end
 end)
 
-    end)
-end
 -- ============================================================
 -- AUTO SELL — AskWearTool + getnilinstances + ToolTrigger
 -- Confirmed dari rspy SAE KONTOL.txt
