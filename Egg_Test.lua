@@ -1031,17 +1031,25 @@ end)
 
 
 
+
 -- ============================================================
--- LINORIA UI
+-- OBSIDIAN UI
 -- ============================================================
-local repo = "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/"
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library     = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
+local Options = Library.Options
+local Toggles = Library.Toggles
+
 local function Notify(title, text, dur)
     pcall(function()
-        Library:Notify(title .. "\n" .. text, dur or 3)
+        Library:Notify({
+            Title    = title,
+            Content  = text,
+            Duration = dur or 3,
+        })
     end)
 end
 
@@ -1053,26 +1061,24 @@ local RARITIES = {
 }
 
 local Window = Library:CreateWindow({
-    Title     = "Steal An Egg  v2.0",
-    Center    = true,
-    AutoShow  = true,
-    TabPadding = 8,
-    MenuFadeTime = 0.2,
+    Title    = "Steal An Egg",
+    Footer   = "v2.0",
+    AutoShow = true,
+    Center   = true,
 })
 
 local Tabs = {
-    Farm   = Window:AddTab("Farm"),
-    Store  = Window:AddTab("Store"),
-    Config = Window:AddTab("Config"),
+    Farm   = Window:AddTab("Farm",   "wheat"),
+    Store  = Window:AddTab("Store",  "shopping-bag"),
+    Config = Window:AddTab("Config", "settings"),
 }
 
--- ── FARM ─────────────────────────────────────────────────────
+-- ── FARM LEFT — Auto Steal ────────────────────────────────────
 local grpSteal = Tabs.Farm:AddLeftGroupbox("Auto Steal")
 
 grpSteal:AddToggle("AutoSteal", {
     Text    = "Auto Steal",
     Default = false,
-    Tooltip = "Start / stop auto farm",
     Callback = function(v)
         State.running = v
         if v then
@@ -1100,7 +1106,6 @@ grpSteal:AddToggle("AutoSteal", {
 grpSteal:AddToggle("AntiGuard", {
     Text    = "Anti-Guard",
     Default = true,
-    Tooltip = "Speed 1000 when returning",
     Callback = function(v) State.antiGuard = v end,
 })
 
@@ -1111,29 +1116,53 @@ grpSteal:AddToggle("BatAura", {
 })
 
 grpSteal:AddSlider("WalkSpeed", {
-    Text    = "Walk Speed",
-    Default = 120,
-    Min     = 16,
-    Max     = 500,
+    Text     = "Walk Speed",
+    Default  = 120,
+    Min      = 16,
+    Max      = 500,
     Rounding = 0,
     Callback = function(v) State.speed = v end,
 })
 
--- Right side: visual
+-- Rarity Filter
+grpSteal:AddDropdown("FarmRarities", {
+    Values   = RARITIES,
+    Default  = 1,
+    Multi    = true,
+    Text     = "Target Rarities",
+    Tooltip  = "Kosong = steal semua",
+    Callback = function(v)
+        State.targetRarities = {}
+        for k, sel in pairs(v) do
+            if sel then State.targetRarities[k] = true end
+        end
+    end,
+})
+
+-- ── FARM RIGHT — Visual ───────────────────────────────────────
 local grpVisual = Tabs.Farm:AddRightGroupbox("Visual")
+
+grpVisual:AddToggle("EggESP", {
+    Text    = "Egg ESP",
+    Default = false,
+    Callback = function(v)
+        State.espEnabled = v
+        if not v then for uid in pairs(EspHighlights) do clearESP(uid) end end
+    end,
+})
 
 grpVisual:AddToggle("FloatVis", {
     Text    = "Float (visual)",
     Default = false,
-    Tooltip = "Client-side float, cuma lo yang liat",
+    Tooltip = "Client-side, cuma lo yang liat",
     Callback = function(v) State.floatEnabled = v; updateFloat() end,
 })
 
 grpVisual:AddSlider("FloatHeight", {
-    Text    = "Float Height",
-    Default = 3,
-    Min     = 1,
-    Max     = 10,
+    Text     = "Float Height",
+    Default  = 3,
+    Min      = 1,
+    Max      = 10,
     Rounding = 0,
     Callback = function(v) State.floatHeight = v end,
 })
@@ -1145,16 +1174,7 @@ grpVisual:AddToggle("AnimToggle", {
     Callback = function(v) State.animEnabled = v; updateAnim() end,
 })
 
-grpVisual:AddToggle("EggESP", {
-    Text    = "Egg ESP",
-    Default = false,
-    Callback = function(v)
-        State.espEnabled = v
-        if not v then for uid in pairs(EspHighlights) do clearESP(uid) end end
-    end,
-})
-
--- Place Egg
+-- ── FARM LEFT — Place & Hatch ─────────────────────────────────
 local grpPlace = Tabs.Farm:AddLeftGroupbox("Auto Place Egg")
 
 grpPlace:AddToggle("PlaceEgg", {
@@ -1164,24 +1184,21 @@ grpPlace:AddToggle("PlaceEgg", {
 })
 
 grpPlace:AddSlider("PlaceInterval", {
-    Text    = "Interval (s)",
-    Default = 5, Min = 1, Max = 30, Rounding = 0,
+    Text = "Interval (s)", Default = 5, Min = 1, Max = 30, Rounding = 0,
     Callback = function(v) State.placeInterval = v end,
 })
 
 grpPlace:AddDropdown("PlaceMinRarity", {
-    Values  = RARITIES,
-    Default = 1,
-    Text    = "Min Rarity",
+    Values   = RARITIES,
+    Default  = 1,
+    Text     = "Min Rarity",
     Callback = function(v) State.placeMinRarity = v end,
 })
 
-grpPlace:AddButton({
-    Text = "Place Now",
-    Func = function() loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2) end,
-})
+grpPlace:AddButton({ Text = "Place Now", Func = function()
+    loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2)
+end })
 
--- Hatch
 local grpHatch = Tabs.Farm:AddRightGroupbox("Auto Hatch")
 
 grpHatch:AddToggle("HatchEgg", {
@@ -1191,60 +1208,30 @@ grpHatch:AddToggle("HatchEgg", {
 })
 
 grpHatch:AddSlider("HatchInterval", {
-    Text    = "Interval (s)",
-    Default = 3, Min = 1, Max = 30, Rounding = 0,
+    Text = "Interval (s)", Default = 3, Min = 1, Max = 30, Rounding = 0,
     Callback = function(v) State.hatchInterval = v end,
 })
 
-grpHatch:AddButton({
-    Text = "Hatch Now",
-    Func = function() loadModules(); pcall(runAutoHatch); Notify("Hatch","Triggered!",2) end,
-})
-
--- Rarity Filter
-local grpRarity = Tabs.Farm:AddLeftGroupbox("Rarity Filter")
-
-grpRarity:AddDropdown("FarmRarities", {
-    Values  = RARITIES,
-    Default = 1,
-    Multi   = true,
-    Text    = "Target Rarities",
-    Tooltip = "Kosong = steal semua",
-    Callback = function(v)
-        State.targetRarities = {}
-        for k, sel in pairs(v) do
-            if sel then State.targetRarities[k] = true end
-        end
-    end,
-})
+grpHatch:AddButton({ Text = "Hatch Now", Func = function()
+    loadModules(); pcall(runAutoHatch); Notify("Hatch","Triggered!",2)
+end })
 
 -- Value Filter
 local grpVal = Tabs.Farm:AddRightGroupbox("Value Filter")
 
 grpVal:AddInput("MinEarning", {
-    Default     = "0",
-    Numeric     = true,
-    Finished    = true,
-    Text        = "Min Earning Rate",
-    Placeholder = "0 = off",
+    Default = "0", Numeric = true, Finished = true,
+    Text = "Min Earning Rate", Placeholder = "0 = off",
     Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
 })
-
 grpVal:AddInput("MinWeight", {
-    Default     = "0",
-    Numeric     = true,
-    Finished    = true,
-    Text        = "Min Weight",
-    Placeholder = "0 = off",
+    Default = "0", Numeric = true, Finished = true,
+    Text = "Min Weight", Placeholder = "0 = off",
     Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
 })
-
 grpVal:AddInput("MaxWeight", {
-    Default     = "0",
-    Numeric     = true,
-    Finished    = true,
-    Text        = "Max Weight",
-    Placeholder = "0 = off",
+    Default = "0", Numeric = true, Finished = true,
+    Text = "Max Weight", Placeholder = "0 = off",
     Callback = function(v)
         local n = tonumber(v) or 0
         State.maxModelWeight = n == 0 and 999999999 or n
@@ -1255,42 +1242,30 @@ grpVal:AddInput("MaxWeight", {
 local grpSell = Tabs.Store:AddLeftGroupbox("Auto Sell")
 
 grpSell:AddToggle("SellEnable", {
-    Text    = "Enable Auto Sell",
-    Default = false,
+    Text = "Enable Auto Sell", Default = false,
     Callback = function(v) State.sellEnabled = v; if v then loadModules() end end,
 })
-
 grpSell:AddToggle("SellAll", {
-    Text    = "Sell Every Pet",
-    Default = false,
+    Text = "Sell Every Pet", Default = false,
     Callback = function(v) State.sellAll = v end,
 })
-
 grpSell:AddSlider("SellInterval", {
-    Text    = "Interval (s)",
-    Default = 5, Min = 1, Max = 60, Rounding = 0,
+    Text = "Interval (s)", Default = 5, Min = 1, Max = 60, Rounding = 0,
     Callback = function(v) State.sellInterval = v end,
 })
-
 grpSell:AddDropdown("SellMaxRarity", {
-    Values  = RARITIES,
-    Default = "Epic",
-    Text    = "Sell Max Rarity",
+    Values = RARITIES, Default = "Epic", Text = "Sell Max Rarity",
     Callback = function(v) State.sellMaxRarity = v end,
 })
-
-grpSell:AddButton({
-    Text = "Sell Now",
-    Func = function() loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2) end,
-})
+grpSell:AddButton({ Text = "Sell Now", Func = function()
+    loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
+end })
 
 -- ── CONFIG ─────────────────────────────────────────────────────
-local grpCfg = Tabs.Config:AddLeftGroupbox("Config")
-
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:SetFolder("SAE_Test")
 SaveManager:BuildConfigSection(Tabs.Config)
-ThemeManager:ApplyToGroupbox(grpCfg)
+ThemeManager:ApplyToTab(Tabs.Config)
 
 Notify("Steal An Egg", "v2.0 loaded!", 3)
