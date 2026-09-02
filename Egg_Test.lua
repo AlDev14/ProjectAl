@@ -595,10 +595,16 @@ local function runAutoPlace()
         local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
 
-        -- ReadOwnerEggs return dict {[uid_string] = record} — pakai pairs
-        for uid, rec in pairs(owned) do
-            if type(uid) ~= "string" then continue end  -- skip numeric keys
-            if rec.Placement ~= nil then continue end    -- sudah di-place, skip
+        -- Handle dua format: dict {[uid]=rec} atau array {[1]={Uid=uid,...}}
+        for k, rec in pairs(owned) do
+            local uid
+            if type(k) == "string" then
+                uid = k  -- dict format
+            elseif type(rec) == "table" and rec.Uid then
+                uid = rec.Uid  -- array format
+            end
+            if not uid then continue end
+            if rec.Placement ~= nil then continue end  -- sudah di-place
 
             -- Filter rarity
             if minRarNum > 0 then
