@@ -1773,10 +1773,11 @@ local RARITIES = {
 }
 
 local Window = Library:CreateWindow({
-    Title    = "Steal An Egg",
-    Footer   = "v2.0",
-    AutoShow = true,
-    Center   = true,
+    Title           = "Steal An Egg",
+    Footer          = "v2.0",
+    AutoShow        = true,
+    Center          = true,
+    MobileButtonsSide = "Right",
 })
 
 local Tabs = {
@@ -1936,8 +1937,24 @@ grpPlace:AddSlider("PlaceInterval", {
 grpPlace:AddDropdown("PlaceMinRarity", {
     Values   = RARITIES,
     Default  = 1,
+    Multi    = true,
     Text     = "Min Rarity",
-    Callback = function(v) State.placeMinRarity = v end,
+    Tooltip  = "Kosong = place semua rarity",
+    Callback = function(v)
+        -- ambil rarity terendah dari selection
+        local minNum = 999
+        for k, sel in pairs(v) do
+            if sel and RARITY_ORDER[k] then
+                minNum = math.min(minNum, RARITY_ORDER[k])
+            end
+        end
+        State.placeMinRarity = minNum < 999 and (function()
+            for k,_ in pairs(RARITY_ORDER) do
+                if RARITY_ORDER[k] == minNum then return k end
+            end
+            return "All"
+        end)() or "All"
+    end,
 })
 
 grpPlace:AddButton({ Text = "Place Now", Func = function()
@@ -2028,8 +2045,22 @@ grpSell:AddSlider("SellInterval", {
     Callback = function(v) State.sellInterval = v end,
 })
 grpSell:AddDropdown("SellMaxRarity", {
-    Values = RARITIES, Default = "Epic", Text = "Sell Max Rarity",
-    Callback = function(v) State.sellMaxRarity = v end,
+    Values = RARITIES, Default = 1, Multi = true, Text = "Sell Max Rarity",
+    Tooltip = "Jual pet sampai rarity ini",
+    Callback = function(v)
+        local maxNum = 0
+        for k, sel in pairs(v) do
+            if sel and RARITY_ORDER[k] then
+                maxNum = math.max(maxNum, RARITY_ORDER[k])
+            end
+        end
+        if maxNum == 0 then State.sellMaxRarity = "Epic"
+        else
+            for k,_ in pairs(RARITY_ORDER) do
+                if RARITY_ORDER[k] == maxNum then State.sellMaxRarity = k; break end
+            end
+        end
+    end,
 })
 grpSell:AddButton({ Text = "Sell Now", Func = function()
     loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
@@ -2077,8 +2108,23 @@ grpFav:AddSlider("FavInterval", {
     Callback = function(v) State.favoriteInterval = v end,
 })
 grpFav:AddDropdown("FavMinRarity", {
-    Values = RARITIES, Default = "Legendary", Text = "Min Rarity",
-    Callback = function(v) State.favoriteMinRarity = v end,
+    Values = RARITIES, Default = 1, Multi = true, Text = "Min Rarity",
+    Tooltip = "Favorite pet >= rarity ini",
+    Callback = function(v)
+        local minNum = 999
+        for k, sel in pairs(v) do
+            if sel and RARITY_ORDER[k] then
+                minNum = math.min(minNum, RARITY_ORDER[k])
+            end
+        end
+        if minNum < 999 then
+            for k,_ in pairs(RARITY_ORDER) do
+                if RARITY_ORDER[k] == minNum then State.favoriteMinRarity = k; break end
+            end
+        else
+            State.favoriteMinRarity = "Legendary"
+        end
+    end,
 })
 grpFav:AddButton({ Text = "Favorite Now", Func = function()
     pcall(runAutoFavorite); Notify("Favorite","Done!",2)
