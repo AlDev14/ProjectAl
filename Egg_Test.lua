@@ -111,6 +111,16 @@ end
 -- Tool di Backpack = nama pet saja (tanpa " Egg")
 -- ============================================================
 -- ============================================================
+-- RARITY ORDER (global)
+-- ============================================================
+local RARITY_ORDER = {
+    Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,
+    SuperRare=7,Exotic=8,Limited=9,Divine=10,Secret=11,Titan=12,
+    Cosmic=13,Celestial=14,Transcendent=15,Prismatic=16,Rainbow=17,
+    Eternal=18,Brainrot=19,Mythical=20,Exclusive=21,
+}
+
+-- ============================================================
 -- EGG AREA NAMES (biome names di backpack)
 -- ============================================================
 local AREA_NAMES = {
