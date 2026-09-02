@@ -296,8 +296,7 @@ local function isValueAllowed(record)
 end
 
 -- ============================================================
--- HUMANOID BYPASS — tanpa clone/destroy
--- Pakai WalkSpeed Heartbeat + re-detect kalau di-reset game
+-- HUMANOID BYPASS — clone/destroy + AutoJump = true
 -- ============================================================
 local _speedConn = nil
 local _camConn   = nil
@@ -310,23 +309,30 @@ local function doHumanoidBypass()
     local rootPart = char:FindFirstChild("HumanoidRootPart")
     if not origHum or not rootPart then return end
 
-    -- Teleport ke StartPosition
     pcall(function()
-        rootPart.CFrame                  = CFrame.new(START_POS)
-        rootPart.AssemblyLinearVelocity  = Vector3.new(0, 35, 0)
-        rootPart.AssemblyAngularVelocity = Vector3.zero
-    end)
+        local clone = origHum:Clone()
+        clone.WalkSpeed   = State.speed
+        clone.JumpPower   = origHum.JumpPower
+        clone.MaxHealth   = origHum.MaxHealth
+        clone.Health      = origHum.Health
+        clone.AutoRotate  = origHum.AutoRotate
+        clone.DisplayName = origHum.DisplayName
+        clone.AutoJump    = true  -- jump normal Roblox (Space/button)
+        clone.Parent      = char
+        task.wait(0.05)
+        origHum:Destroy()
 
-    -- Set WalkSpeed via Heartbeat (re-set tiap frame kalau game reset)
-    if _speedConn then _speedConn:Disconnect() end
-    _speedConn = RunService.Heartbeat:Connect(function()
-        if not State.running then return end
-        local c = LocalPlayer.Character
-        if not c then return end
-        local h = c:FindFirstChildOfClass("Humanoid")
-        if h and h.WalkSpeed ~= State.speed then
-            h.WalkSpeed = State.speed
+        -- Teleport ke StartPosition
+        if rootPart and rootPart.Parent then
+            rootPart.CFrame                  = CFrame.new(START_POS)
+            rootPart.AssemblyLinearVelocity  = Vector3.new(0, 35, 0)
+            rootPart.AssemblyAngularVelocity = Vector3.zero
         end
+
+        task.wait(0.05)
+        clone.PlatformStand = false
+        clone.Sit           = false
+        pcall(function() clone:ChangeState(Enum.HumanoidStateType.Running) end)
     end)
 
     -- Camera lock
