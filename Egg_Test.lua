@@ -1,5 +1,5 @@
 -- ============================================================
---  STEAL AN EGG — Rebuild v2.0
+--  STEAL AN EGG -- Rebuild v2.0
 --  Clean architecture, no external dependencies
 -- ============================================================
 
@@ -315,7 +315,7 @@ local MUTATIONS = {"Silver", "Bloom", "Golden", "Rainbow", "Spirit Bloom"}
 
 local function isMutationAllowed(record)
     if not next(State.targetMutations) then return true end
-    -- record.Mutations = {table} — cek apakah ada mutasi yang match
+    -- record.Mutations = {table} -- cek apakah ada mutasi yang match
     if not record or not record.Mutations then return false end
     if type(record.Mutations) ~= "table" then return false end
     for mutName, _ in pairs(State.targetMutations) do
@@ -370,7 +370,7 @@ local function isValueAllowed(record)
 end
 
 -- ============================================================
--- NO KNOCKBACK — disconnect RE/RigSync/Refresh (Lutosys/opensrc)
+-- NO KNOCKBACK -- disconnect RE/RigSync/Refresh (Lutosys/opensrc)
 -- ============================================================
 local function applyNoKnockback()
     if type(getconnections) ~= "function" then
@@ -393,7 +393,7 @@ local function applyNoKnockback()
 end
 
 -- ============================================================
--- AUTO UPGRADE BASE — RE/Homestead/AskBaseTierRaise (Lutosys/opensrc)
+-- AUTO UPGRADE BASE -- RE/Homestead/AskBaseTierRaise (Lutosys/opensrc)
 -- ============================================================
 local function upgradeBase()
     local net = ReplicatedStorage:FindFirstChild("Packages")
@@ -474,7 +474,7 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================
--- FLOAT SYSTEM — client-side visual only (RenderStepped)
+-- FLOAT SYSTEM -- client-side visual only (RenderStepped)
 -- Direct offset tanpa lerp biar gak bouncing
 -- ============================================================
 local _floatConn = nil
@@ -497,7 +497,7 @@ local function updateFloat()
 end
 
 -- ============================================================
--- ANIMATION TOGGLE — Heartbeat loop biar gak re-apply
+-- ANIMATION TOGGLE -- Heartbeat loop biar gak re-apply
 -- ============================================================
 local _animTracks = {}
 local _animConn   = nil
@@ -665,7 +665,7 @@ end
 -- AUTO PLACE
 -- ============================================================
 -- ============================================================
--- AUTO PLACE — independent loop
+-- AUTO PLACE -- independent loop
 -- ============================================================
 local function runAutoPlace()
     if not PlotState then loadModules() end
@@ -691,7 +691,7 @@ local function runAutoPlace()
         local wearRemote  = net and net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not placeRemote then warn("[AutoPlace] AskPlaceEgg not found"); return end
 
-        -- Scan semua slot di PetArea — random offset biar egg tersebar
+        -- Scan semua slot di PetArea -- random offset biar egg tersebar
         local petArea = myPlot.PetArea
         local centerCF = myPlot.CenterPoint.CFrame
         local petSize = petArea.Size
@@ -722,7 +722,7 @@ local function runAutoPlace()
             print("[AutoPlace] EggState nil"); return
         end
 
-        -- Sync — lanjut meski gagal
+        -- Sync -- lanjut meski gagal
         local syncOk, syncErr = pcall(function() EggState.SyncOwnedEggs() end)
         if not syncOk then
             warn("[AutoPlace] SyncOwnedEggs error:", tostring(syncErr))
@@ -733,7 +733,7 @@ local function runAutoPlace()
             return EggState.ReadOwnerEggs(LocalPlayer.UserId)
         end)
         if not ok or type(owned) ~= "table" or not next(owned) then
-            print("[AutoPlace] owned egg kosong — ok:", ok, "type:", type(owned))
+            print("[AutoPlace] owned egg kosong -- ok:", ok, "type:", type(owned))
             return
         end
 
@@ -777,7 +777,7 @@ local function runAutoPlace()
                 if rarNum > 0 and rarNum < minRarNum then continue end
             end
 
-            -- 1. Equip egg — sama kayak auto place pet (pindah tool ke Character)
+            -- 1. Equip egg -- sama kayak auto place pet (pindah tool ke Character)
             -- Cari tool di backpack yang match uid atau ItemType=AssetEgg
             local eggTool = nil
             for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
@@ -815,7 +815,7 @@ local function runAutoPlace()
 end
 
 -- Count-based trigger: cek jumlah egg di backpack setiap 1 detik
--- Kalau >= placeThreshold → stop farm → SAFE_POS → plot → place → resume
+-- Kalau >= placeThreshold -> stop farm -> SAFE_POS -> plot -> place -> resume
 task.spawn(function()
     while true do
         task.wait(1)
@@ -873,7 +873,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- ANTI-STUCK TREADMILL — jump kalau posisi gak berubah saat farm aktif
+-- ANTI-STUCK TREADMILL -- jump kalau posisi gak berubah saat farm aktif
 -- ============================================================
 task.spawn(function()
     local lastPos = Vector3.new(0,0,0)
@@ -887,7 +887,7 @@ task.spawn(function()
         if dist < 1.5 then
             stuckTimer += 1
             if stuckTimer >= 3 then
-                -- Kemungkinan nyangkut di treadmill — paksa jump
+                -- Kemungkinan nyangkut di treadmill -- paksa jump
                 local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if h then h.Jump = true end
                 stuckTimer = 0
@@ -901,7 +901,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- CYCLE PANEL — countdown 5 menit + egg field rarity
+-- CYCLE PANEL -- countdown 5 menit + egg field rarity
 -- ============================================================
 local _cycleGui = Instance.new("ScreenGui")
 _cycleGui.Name = "SAE_CyclePanel"
@@ -1109,7 +1109,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO HATCH — independent loop
+-- AUTO HATCH -- independent loop
 -- ============================================================
 local function runAutoHatch()
     if not EggState then return end
@@ -1121,7 +1121,7 @@ local function runAutoHatch()
         local AskFinishHatch = net:FindFirstChild("RF/EggWorld/AskFinishHatch")
         if not AskHatch and not AskFinishHatch then return end
 
-        -- ReadOwnerEggs(userId) → {[uid]=record}
+        -- ReadOwnerEggs(userId) -> {[uid]=record}
         local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
         if type(owned) ~= "table" then return end
 
@@ -1159,7 +1159,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO SELL EGG — ReadOwnerEggs + SellPet:FireServer({uid})
+-- AUTO SELL EGG -- ReadOwnerEggs + SellPet:FireServer({uid})
 -- ============================================================
 local function runAutoSellEgg()
     if not EggState then loadModules() end
@@ -1209,7 +1209,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO PLACE BEST PET — sort by rarity tertinggi dulu
+-- AUTO PLACE BEST PET -- sort by rarity tertinggi dulu
 -- ============================================================
 local function runAutoPlaceBestPet()
     if not PlotState then loadModules() end
@@ -1278,7 +1278,7 @@ local function runAutoPlaceBestPet()
 end
 
 -- ============================================================
--- COLLECT MONEY — RF/AwayEarnings/AskCollect (confirmed rspy)
+-- COLLECT MONEY -- RF/AwayEarnings/AskCollect (confirmed rspy)
 -- ============================================================
 local function runCollectMoney()
     pcall(function()
@@ -1310,7 +1310,7 @@ end)
 
 -- ============================================================
 -- ============================================================
--- AUTO FAVORITE PET — event-based, filter rarity/mutasi/weight/value
+-- AUTO FAVORITE PET -- event-based, filter rarity/mutasi/weight/value
 -- ============================================================
 
 -- Helper: cek apakah tool layak di-favorite
@@ -1397,7 +1397,7 @@ LocalPlayer.Backpack.ChildAdded:Connect(function(tool)
 end)
 
 -- ============================================================
--- AUTO SELL — AskWearTool + getnilinstances + ToolTrigger
+-- AUTO SELL -- AskWearTool + getnilinstances + ToolTrigger
 -- Confirmed dari rspy SAE KONTOL.txt
 -- ============================================================
 local function getToolFromNil(name)
@@ -1435,7 +1435,7 @@ local function runAutoSell()
         local wearRemote    = net:FindFirstChild("RF/EggWorld/AskWearTool")
         local triggerRemote = net:FindFirstChild("RE/ToolTrigger/Trigger")
         if not wearRemote or not triggerRemote then
-            warn("[AutoSell] remote missing — wearTool:" .. tostring(wearRemote ~= nil) ..
+            warn("[AutoSell] remote missing -- wearTool:" .. tostring(wearRemote ~= nil) ..
                  " trigger:" .. tostring(triggerRemote ~= nil))
             return
         end
@@ -1500,7 +1500,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO SELL PET — scan Backpack by name (PET_RARITY_MAP)
+-- AUTO SELL PET -- scan Backpack by name (PET_RARITY_MAP)
 -- Butuh remote sell single pet dari rspy lo nanti
 -- ============================================================
 local function runAutoSellPet()
@@ -1704,7 +1704,7 @@ local function farmCycle()
         if not walkTo(part.Position, 15, false) then return end
         if not State.running then return end
 
-        -- 3. Claim — cek jarak dulu, kalau kena guardian skip
+        -- 3. Claim -- cek jarak dulu, kalau kena guardian skip
         r = root()
         if not r then return end
         local dist = (r.Position - part.Position).Magnitude
@@ -1720,7 +1720,7 @@ local function farmCycle()
             end
         end)
 
-        -- Claim cepat — instant interact sudah handle hold duration
+        -- Claim cepat -- instant interact sudah handle hold duration
         for _ = 1, 5 do
             pcall(function() EggState.CarryFieldEgg(rec.Uid, slotKey) end)
             local prompt = model:FindFirstChild("CarryAreaEgg", true)
@@ -1964,7 +1964,7 @@ do
 end
 
 if not Library then
-    warn("[SAE] Obsidian gagal load — UI tidak muncul")
+    warn("[SAE] Obsidian gagal load -- UI tidak muncul")
     return
 end
 
@@ -2000,7 +2000,7 @@ local Tabs = {
     Config = Window:AddTab("Config", "settings"),
 }
 
--- ── FARM LEFT — Auto Steal ────────────────────────────────────
+-- -- FARM LEFT -- Auto Steal ------------------------------------
 local grpSteal = Tabs.Farm:AddLeftGroupbox("Auto Steal")
 
 grpSteal:AddToggle("AutoSteal", {
@@ -2045,7 +2045,7 @@ grpSteal:AddToggle("BatAura", {
 grpSteal:AddToggle("NoKnockback", {
     Text    = "No Knockback",
     Default = false,
-    Tooltip = "Disconnect RigSync/Refresh — getconnections required",
+    Tooltip = "Disconnect RigSync/Refresh -- getconnections required",
     Callback = function(v)
         State.noKnockback = v
         if v then applyNoKnockback() end
@@ -2090,7 +2090,7 @@ grpSteal:AddDropdown("FarmMutations", {
     end,
 })
 
--- ── FARM RIGHT — Visual ───────────────────────────────────────
+-- -- FARM RIGHT -- Visual ---------------------------------------
 local grpVisual = Tabs.Farm:AddRightGroupbox("Visual")
 
 grpVisual:AddToggle("EggESP", {
@@ -2133,7 +2133,7 @@ grpVisual:AddButton({ Text = "Upgrade Treadmill", Callback = function()
     upgradeTreadmill(1)
 end })
 
--- ── FARM LEFT — Place & Hatch ─────────────────────────────────
+-- -- FARM LEFT -- Place & Hatch ---------------------------------
 local grpPlace = Tabs.Farm:AddLeftGroupbox("Auto Place Egg")
 
 grpPlace:AddToggle("PlaceEgg", {
@@ -2243,7 +2243,7 @@ grpVal:AddInput("MaxWeightInp", {
     end,
 })
 
--- ── STORE ─────────────────────────────────────────────────────
+-- -- STORE -----------------------------------------------------
 local grpSell = Tabs.Store:AddLeftGroupbox("Auto Sell")
 
 grpSell:AddToggle("SellEnable", {
@@ -2365,8 +2365,8 @@ grpFav:AddButton({ Text = "Favorite Now", Callback = function()
     pcall(runAutoFavorite); Notify("Favorite","Done!",2)
 end })
 
--- ── CONFIG ─────────────────────────────────────────────────────
--- ── MISC TAB ─────────────────────────────────────────────────
+-- -- CONFIG -----------------------------------------------------
+-- -- MISC TAB -------------------------------------------------
 local grpMisc = Tabs.Misc:AddLeftGroupbox("Visual")
 
 grpMisc:AddToggle("ShowStats", {
