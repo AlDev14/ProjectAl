@@ -593,25 +593,31 @@ local function runAutoPlace()
 
         local placed = 0
         for _, egg in ipairs(eggs) do
-            -- Equip: pindah tool ke Character
-            pcall(function() egg.tool.Parent = LocalPlayer.Character end)
-            task.wait(0.15)
-
-            -- Cari uid — dari EggState cross-ref, atau attribute tool
+            -- Cari uid dulu
             local uid = uidMap[egg.name]
                 or egg.tool:GetAttribute("Uid")
                 or egg.tool:GetAttribute("uid")
-                or egg.name  -- fallback nama
 
+            -- 1. WearEggTool (AskWearTool) — equip via remote dulu
+            if uid and wearRemote then
+                pcall(function() wearRemote:InvokeServer(uid) end)
+                task.wait(0.2)
+            else
+                -- Fallback: pindah tool ke Character langsung
+                pcall(function() egg.tool.Parent = LocalPlayer.Character end)
+                task.wait(0.15)
+            end
+
+            -- 2. PlantEgg (AskPlaceEgg)
+            local finalUid = uid or egg.name
             local ok3, res = pcall(function()
-                return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
+                return placeRemote:InvokeServer({Uid = finalUid, LocalCFrame = localCFrame})
             end)
             if ok3 and res then
                 placed += 1
-                print("[AutoPlace] placed:", egg.name, "uid:", tostring(uid))
+                print("[AutoPlace] placed:", egg.name, "uid:", tostring(finalUid))
             else
                 warn("[AutoPlace] failed:", egg.name, tostring(res))
-                -- Kembalikan tool ke backpack kalau gagal
                 pcall(function() egg.tool.Parent = LocalPlayer.Backpack end)
             end
             task.wait(0.1)
