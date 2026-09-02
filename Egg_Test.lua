@@ -103,6 +103,57 @@ local function hum()
     return c and c:FindFirstChildOfClass("Humanoid")
 end
 
+-- ============================================================
+-- EGG NAME LOOKUP BY RARITY (Source: IGN wiki + in-game)
+-- Tool di Backpack = "[PetName] Egg"
+-- ============================================================
+local EGG_BY_RARITY = {
+    ["Common"]    = {"Chicken Egg","Dog Egg","Frog Egg","Duckling Egg","Jerboa Egg"},
+    ["Uncommon"]  = {"Bird Egg","Catfish Egg","Fennec Egg"},
+    ["Rare"]      = {"Owl Egg","Raccoon Egg","Turtle Egg","Camel Egg","Toucan Egg","Chimpanzee Egg","Penguin Egg","Lava Gecko Egg","Parrotfish Egg","Dodo Egg","Tung Tung Sahur Egg"},
+    ["Epic"]      = {"Bear Egg","Fox Egg","Trulimero Trulicina Egg","Swan Egg","Tob Tobi Tob Tob Egg","Crocodile Egg","Walrus Egg","Lava Frog Egg","Swordfish Egg","Centapede Egg","Crane Egg","Bananita Dolphinita Egg"},
+    ["Legendary"] = {"Brr Brr Patapim Egg","Axolotl Egg","Snake Egg","Gorilla Egg","Orangutini Ananassini Egg","Polar Bear Egg","Flaming Bull Egg","Lava Iguana Egg","Shark Egg","Pterodactyl Egg","Cosmic Gecko Egg","Salamander Egg","Crustacia Egg","Spideron Egg","Scorpio Egg","Mecha Scorpio Egg"},
+    ["Mythic"]    = {"Scorpion Egg","Sand Spider Egg","Spider Egg","Tiger Egg","Sabertooth Tiger Egg","Mammoth Egg","Chillin Chilli Egg","Orca Egg","Ankylosaurus Egg","Cosmic Gorilla Egg","Red Panda Egg","Bladehide Egg","Belula Beluga Egg","Froggo Egg","Mecha Froggo Egg"},
+    ["Divine"]    = {"Unicorn Egg","Kitsune Egg","Dreadscale Egg","Mecha Dreadscale Egg"},
+    ["Secret"]    = {"King Snake Egg","Yeti Egg","Cerberus Egg","Kraken Egg","Tralaledon Egg","TRex Egg","Cosmic Dragon Egg","Cosmic Skeleton Boss Egg","Stag Egg","Mutant Shark Egg","Bomboclat Crocolat Egg","Crocodon Egg","Mecha Crocodon Egg"},
+    ["Cosmic"]    = {"Leviathan Egg","Royal Sphinx Egg","King Mammoth Egg","Whale Shark Egg","Beluga Whale Egg","Triceratops Egg","Bronto Egg","Mosasaurus Egg","Koi Egg","Snowy Owl Egg","Mantaris Egg","Rhinotaur Egg","Mangolini Parrochini Egg","Crawler Egg","Mecha Crawler Egg"},
+    ["Eternal"]   = {"Ice Dragon Egg","Phoenix Egg","Lava Dragon Egg","El Maja Egg","Eternal Lunar Dragon Egg","Oni Tiger Egg","Gorilla King Egg","Strawberry Elephant Egg","Krakenoid Egg","Mecha Krakenoid Egg"},
+}
+
+-- Flat reverse: eggName → rarity
+local EGG_RARITY_MAP = {}
+for rarity, eggs in pairs(EGG_BY_RARITY) do
+    for _, name in ipairs(eggs) do
+        EGG_RARITY_MAP[name] = rarity
+    end
+end
+
+-- Rarity order buat compare
+local RARITY_ORDER = {
+    Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,
+    SuperRare=7,Exotic=8,Limited=9,Divine=10,Secret=11,Titan=12,
+    Cosmic=13,Celestial=14,Transcendent=15,Prismatic=16,Rainbow=17,
+    Eternal=18,Brainrot=19,Mythical=20,Exclusive=21,
+}
+
+-- Helper: ambil semua egg dari Backpack, filter by min rarity
+local function getEggsFromBackpack(minRarity)
+    local result = {}
+    local minNum = RARITY_ORDER[minRarity] or 0
+    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            local rarity = EGG_RARITY_MAP[tool.Name]
+            if rarity then -- ini egg
+                local rarNum = RARITY_ORDER[rarity] or 0
+                if minNum <= 0 or rarNum >= minNum then
+                    table.insert(result, {tool = tool, name = tool.Name, rarity = rarity, rarNum = rarNum})
+                end
+            end
+        end
+    end
+    return result
+end
+
 local function formatNumber(n)
     n = tonumber(n) or 0
     if n >= 1e9  then return string.format("%.1fB", n/1e9)
@@ -487,67 +538,76 @@ end
 -- AUTO PLACE — independent loop
 -- ============================================================
 local function runAutoPlace()
-    if not EggState or not PlotState then return end
+    if not PlotState then loadModules() end
+    if not PlotState then return end
     pcall(function()
         local myPlot = PlotState.ResolvePlot()
         if not myPlot or not myPlot.CenterPoint or not myPlot.PetArea then
-            warn("[AutoPlace] ResolvePlot gagal / PetArea/CenterPoint nil")
+            warn("[AutoPlace] ResolvePlot gagal")
             return
         end
 
-        -- LocalCFrame = posisi PetArea relatif ke CenterPoint
-        local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(
-            CFrame.new(myPlot.PetArea.Position)
-        )
+        -- Walk ke plot dulu
+        local plotPos = myPlot.CenterPoint.Position
+        local r = root()
+        if r and (r.Position - plotPos).Magnitude > 5 then
+            walkTo(plotPos, 15, true)
+        end
+        task.wait(0.3)
 
         local net = ReplicatedStorage:FindFirstChild("Packages")
             and ReplicatedStorage.Packages:FindFirstChild("Networking")
         local placeRemote = net and net:FindFirstChild("RF/EggWorld/AskPlaceEgg")
+        local wearRemote  = net and net:FindFirstChild("RF/EggWorld/AskWearTool")
+        if not placeRemote then warn("[AutoPlace] AskPlaceEgg not found"); return end
 
-        if not placeRemote then
-            warn("[AutoPlace] RF/EggWorld/AskPlaceEgg not found")
+        local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
+
+        -- Scan backpack
+        local eggs = getEggsFromBackpack(State.placeMinRarity == "All" and "" or State.placeMinRarity)
+        if #eggs == 0 then
+            -- Fallback ke EggState
+            if EggState then
+                local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
+                if ok and type(owned) == "table" then
+                    for _, rec in ipairs(owned) do
+                        if not rec.Uid then continue end
+                        if wearRemote then
+                            pcall(function() wearRemote:InvokeServer(rec.Uid) end)
+                            task.wait(0.2)
+                        end
+                        local ok3, res = pcall(function()
+                            return placeRemote:InvokeServer({Uid=rec.Uid, LocalCFrame=localCFrame})
+                        end)
+                        if ok3 and res then print("[AutoPlace] placed (EggState):", rec.Uid) end
+                        task.wait(0.1)
+                    end
+                end
+            end
             return
         end
 
-        local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
-        if not ok or type(owned) ~= "table" or #owned == 0 then
-            print("[AutoPlace] owned egg kosong:", ok, type(owned), #(owned or {}))
-            return
-        end
-
-        -- Debug: print field pertama owned egg biar tau format
-        if owned[1] then
-            print("[AutoPlace] record sample fields:")
-            for k, v in pairs(owned[1]) do
-                print("  ." .. tostring(k) .. " = " .. tostring(type(v) == "table" and "{table}" or v))
-            end
-        end
-
-        local minRarNum = getRarityNumberByName(State.placeMinRarity)
-        local placed, skipped, failed = 0, 0, 0
-
-        for _, rec in ipairs(owned) do
-            if not rec.Uid then continue end
-            if minRarNum > 0 and getRarityNumber(rec) < minRarNum then
-                skipped += 1
-                continue
-            end
-
-            local ok3, res = pcall(function()
-                return placeRemote:InvokeServer({ Uid = rec.Uid, LocalCFrame = localCFrame })
+        local placed = 0
+        for _, egg in ipairs(eggs) do
+            -- Equip dulu: pindah tool ke Character
+            pcall(function()
+                egg.tool.Parent = LocalPlayer.Character
             end)
+            task.wait(0.15)
 
-            if ok3 and res == true then
+            -- Place
+            local ok3, res = pcall(function()
+                return placeRemote:InvokeServer({Uid = egg.tool:GetAttribute("Uid") or egg.name, LocalCFrame = localCFrame})
+            end)
+            if ok3 and res then
                 placed += 1
+                print("[AutoPlace] placed:", egg.name)
             else
-                -- fallback PlantEgg
-                local ok4 = pcall(function() EggState.PlantEgg(rec.Uid, localCFrame) end)
-                if ok4 then placed += 1 else failed += 1 end
+                warn("[AutoPlace] failed:", egg.name, tostring(res))
             end
-            task.wait(0.05)
+            task.wait(0.1)
         end
-
-        print(string.format("[AutoPlace] placed=%d skipped=%d failed=%d", placed, skipped, failed))
+        print(string.format("[AutoPlace] total placed=%d", placed))
     end)
 end
 
