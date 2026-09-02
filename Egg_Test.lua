@@ -595,7 +595,10 @@ local function runAutoPlace()
         local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
 
-        for uid, rec in pairs(owned) do
+        for _, rec in ipairs(owned) do
+            local uid = rec.Uid
+            if not uid then continue end
+
             -- Filter rarity — kalau gak bisa dibaca, loloskan
             if minRarNum > 0 then
                 local rarNum = 0
@@ -604,7 +607,6 @@ local function runAutoPlace()
                 elseif rec.RarityNumber and type(rec.RarityNumber) == "number" then
                     rarNum = rec.RarityNumber
                 end
-                -- rarNum == 0 = unknown rarity, loloskan
                 if rarNum > 0 and rarNum < minRarNum then continue end
             end
 
