@@ -173,12 +173,25 @@ end
 -- ============================================================
 local function isRarityAllowed(record)
     -- Empty = semua allowed
-    if not next(State.targetRarities) then return true end
+    local t = State.targetRarities
+    if not t then return true end
+    -- Cek apakah ada entry
+    local hasAny = false
+    if type(t) == "table" then
+        for _ in pairs(t) do hasAny = true; break end
+    end
+    if not hasAny then return true end
+
     local name = getRarityName(record)
-    -- Orvion multi-select bisa return dict {[name]=true} atau array {name}
-    if State.targetRarities[name] == true then return true end
-    for _, v in ipairs(State.targetRarities) do
-        if v == name then return true end
+    if not name then return true end
+
+    -- VVind multi-dropdown return {[name]=true}
+    if t[name] == true then return true end
+    -- Fallback array format
+    if type(t) == "table" then
+        for _, v in ipairs(t) do
+            if v == name then return true end
+        end
     end
     return false
 end
@@ -194,57 +207,11 @@ local function isValueAllowed(record)
 end
 
 -- ============================================================
--- HUMANOID BYPASS
+-- HUMANOID BYPASS — tanpa clone/destroy
+-- Pakai WalkSpeed Heartbeat + re-detect kalau di-reset game
 -- ============================================================
--- ============================================================
--- SPEED BYPASS (Lutosys/opensrc — stealaeggspeedbypass.lua)
--- Hook internal speed toll checker via getgc + hookfunction
--- Fallback: clone/destroy humanoid kalau executor tidak support
--- ============================================================
-local _speedBypassed = false
 local _speedConn = nil
-local _camConn = nil
-
-local function doSpeedBypass()
-    -- Cek executor support
-    if not getgc or not hookfunction or not islclosure then
-        return false
-    end
-
-    local ok, result = pcall(function()
-        -- Cari function dengan 19 upvalues di line 3 (speed toll checker)
-        local func3 = nil
-        for _, f in next, getgc() do
-            if typeof(f) == "function" and islclosure(f) then
-                local upvs = debug.getupvalues(f)
-                local line = debug.info(f, "l")
-                if upvs and #upvs == 19 and line == 3 then
-                    local t = debug.getupvalue(f, 3)
-                    if typeof(t) == "table" and rawget(t, "Humanoid") then
-                        func3 = f
-                        break
-                    end
-                end
-            end
-        end
-
-        if not func3 then return false end
-
-        local v7 = debug.getupvalue(func3, 2)
-        if not v7 then return false end
-
-        local hookedFunc; hookedFunc = hookfunction(v7, newlclosure(function(p1, p2)
-            if p2 and typeof(p2) == "table" then
-                setmetatable(p2, {})
-            end
-            return hookedFunc(p1, p2)
-        end))
-
-        return true
-    end)
-
-    return ok and result == true
-end
+local _camConn   = nil
 
 local function doHumanoidBypass()
     local char = LocalPlayer.Character
@@ -254,11 +221,6 @@ local function doHumanoidBypass()
     local rootPart = char:FindFirstChild("HumanoidRootPart")
     if not origHum or not rootPart then return end
 
-    -- Coba speed bypass dulu (non-destructive)
-    if not _speedBypassed then
-        _speedBypassed = doSpeedBypass()
-    end
-
     -- Teleport ke StartPosition
     pcall(function()
         rootPart.CFrame                  = CFrame.new(START_POS)
@@ -266,35 +228,17 @@ local function doHumanoidBypass()
         rootPart.AssemblyAngularVelocity = Vector3.zero
     end)
 
-    -- Kalau speed bypass berhasil: set WalkSpeed via Heartbeat
-    -- Kalau gagal: fallback clone/destroy humanoid
-    if _speedBypassed then
-        if _speedConn then _speedConn:Disconnect() end
-        _speedConn = RunService.Heartbeat:Connect(function()
-            local c = LocalPlayer.Character
-            if not c then return end
-            local h = c:FindFirstChildOfClass("Humanoid")
-            if h then h.WalkSpeed = State.speed end
-        end)
-    else
-        -- Fallback: clone/destroy
-        pcall(function()
-            local clone = origHum:Clone()
-            clone.WalkSpeed   = State.speed
-            clone.JumpPower   = origHum.JumpPower
-            clone.MaxHealth   = origHum.MaxHealth
-            clone.Health      = origHum.Health
-            clone.AutoRotate  = origHum.AutoRotate
-            clone.DisplayName = origHum.DisplayName
-            clone.Parent      = char
-            task.wait(0.05)
-            origHum:Destroy()
-            task.wait(0.05)
-            clone.PlatformStand = false
-            clone.Sit           = false
-            pcall(function() clone:ChangeState(Enum.HumanoidStateType.Running) end)
-        end)
-    end
+    -- Set WalkSpeed via Heartbeat (re-set tiap frame kalau game reset)
+    if _speedConn then _speedConn:Disconnect() end
+    _speedConn = RunService.Heartbeat:Connect(function()
+        if not State.running then return end
+        local c = LocalPlayer.Character
+        if not c then return end
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if h and h.WalkSpeed ~= State.speed then
+            h.WalkSpeed = State.speed
+        end
+    end)
 
     -- Camera lock
     if _camConn then _camConn:Disconnect() end
