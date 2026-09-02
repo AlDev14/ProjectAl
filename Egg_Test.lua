@@ -1097,7 +1097,7 @@ task.spawn(function()
             if not EggState then loadModules() end
             pcall(runAutoSell)
         end
-    end)
+    end
 end)
 
 -- ============================================================
