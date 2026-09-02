@@ -1309,80 +1309,91 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO FAVORITE PET — RE/PetSatchel/WriteFavourite
--- Scan backpack pet by name + PET_RARITY_MAP
 -- ============================================================
-local function runAutoFavorite()
-    pcall(function()
-        local net = ReplicatedStorage:FindFirstChild("Packages")
-            and ReplicatedStorage.Packages:FindFirstChild("Networking")
-        if not net then return end
-        local remote = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
-        local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
-        if not remote then warn("[AutoFavorite] WriteFavourite not found"); return end
+-- AUTO FAVORITE PET — event-based, filter rarity/mutasi/weight/value
+-- ============================================================
 
-        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
-        local favCount = 0
+-- Helper: cek apakah tool layak di-favorite
+local function shouldFavorite(tool)
+    if not tool:IsA("Tool") then return false end
+    local itype = tool:GetAttribute("ItemType")
+    if itype ~= "Asset" and itype ~= "Phone" then return false end
 
-        -- Scan backpack — pet = ItemType Asset/Phone
-        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-            if not tool:IsA("Tool") then continue end
-            local itype = tool:GetAttribute("ItemType")
-            if itype ~= "Asset" and itype ~= "Phone" then continue end
+    -- Filter rarity
+    local rarity = PET_RARITY_MAP[tool.Name]
+    local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
+    local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
+    if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then return false end
 
-            local rarity = PET_RARITY_MAP[tool.Name]
-            local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
-            if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then continue end
-
-            local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
-            if not uid then continue end
-
-            -- Equip dulu via WearEggTool
-            if wearRemote then
-                pcall(function() wearRemote:InvokeServer(uid) end)
-                task.wait(0.15)
+    -- Filter mutasi (kosong = semua lolos)
+    if State.favMutations and next(State.favMutations) then
+        local mut = tool:GetAttribute("Mutations")
+        local hasMut = false
+        if type(mut) == "string" then
+            for m, _ in pairs(State.favMutations) do
+                if mut:lower():find(m:lower()) then hasMut = true; break end
             end
-
-            pcall(function() remote:FireServer(uid, true) end)
-            favCount += 1
-            task.wait(0.05)
+        elseif type(mut) == "table" then
+            for _, mv in ipairs(mut) do
+                for m, _ in pairs(State.favMutations) do
+                    if tostring(mv):lower():find(m:lower()) then hasMut = true; break end
+                end
+            end
         end
+        if not hasMut then return false end
+    end
 
-        if favCount > 0 then print("[AutoFavorite] favorited:", favCount) end
+    -- Filter weight
+    local weight = tool:GetAttribute("ModelWeight") or tool:GetAttribute("Weight") or 0
+    if State.favMinWeight and State.favMinWeight > 0 and weight < State.favMinWeight then return false end
+    if State.favMaxWeight and State.favMaxWeight > 0 and weight > State.favMaxWeight then return false end
+
+    -- Filter value (EarningRate)
+    local value = tool:GetAttribute("EarningRate") or tool:GetAttribute("Value") or 0
+    if State.favMinValue and State.favMinValue > 0 and value < State.favMinValue then return false end
+
+    return true
+end
+
+local function favoriteTool(tool)
+    local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
+    if not uid then return false end
+    local net = ReplicatedStorage:FindFirstChild("Packages")
+        and ReplicatedStorage.Packages:FindFirstChild("Networking")
+    if not net then return false end
+    local remote    = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
+    local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
+    if not remote then return false end
+    if wearRemote then pcall(function() wearRemote:InvokeServer(uid) end); task.wait(0.15) end
+    pcall(function() remote:FireServer(uid, true) end)
+    return true
+end
+
+local function runAutoFavorite()
+    if not State.favoriteEnabled then return end
+    pcall(function()
+        local count = 0
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if shouldFavorite(tool) then
+                if favoriteTool(tool) then
+                    count += 1
+                    task.wait(0.05)
+                end
+            end
+        end
+        if count > 0 then print("[AutoFavorite] favorited:", count) end
     end)
 end
 
-task.spawn(function()
-    while true do
-        task.wait(State.favoriteInterval or 30)
-        if State.favoriteEnabled then
-            pcall(runAutoFavorite)
-        end
-    end
-end)
-
--- Event-based favorite: langsung favorite saat pet baru masuk backpack
+-- Event-based: langsung cek saat pet masuk backpack
 LocalPlayer.Backpack.ChildAdded:Connect(function(tool)
     if not State.favoriteEnabled then return end
-    task.wait(0.3) -- tunggu attributes ke-sync
-    pcall(function()
-        if not tool:IsA("Tool") then return end
-        local itype = tool:GetAttribute("ItemType")
-        if itype ~= "Asset" and itype ~= "Phone" then return end
-        local rarity = PET_RARITY_MAP[tool.Name]
-        local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
-        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
-        if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then return end
-        local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
-        if not uid then return end
-        local net = ReplicatedStorage:FindFirstChild("Packages")
-            and ReplicatedStorage.Packages:FindFirstChild("Networking")
-        local remote = net and net:FindFirstChild("RE/PetSatchel/WriteFavourite")
-        if remote then
-            pcall(function() remote:FireServer(uid, true) end)
-            print("[AutoFavorite] auto-fav new pet:", tool.Name)
+    task.wait(0.3) -- tunggu attributes sync
+    if shouldFavorite(tool) then
+        if favoriteTool(tool) then
+            print("[AutoFavorite] fav new:", tool.Name)
         end
-    end)
+    end
 end)
 
 -- ============================================================
@@ -2315,16 +2326,12 @@ local grpFav = Tabs.Store:AddRightGroupbox("Auto Favorite")
 grpFav:AddToggle("FavEnable", {
     Text    = "Auto Favorite",
     Default = false,
-    Tooltip = "Event-based: langsung favorite saat pet baru masuk backpack",
+    Tooltip = "Event-based: langsung favorite saat pet masuk backpack",
     Callback = function(v) State.favoriteEnabled = v end,
-})
-grpFav:AddSlider("FavInterval", {
-    Text = "Interval (s)", Default = 30, Min = 10, Max = 300, Rounding = 0,
-    Callback = function(v) State.favoriteInterval = v end,
 })
 grpFav:AddDropdown("FavMinRarity", {
     Values = RARITIES, Default = 1, Multi = true, Text = "Min Rarity",
-    Tooltip = "Favorite pet >= rarity ini",
+    Tooltip = "Favorite pet >= rarity ini (kosong = semua)",
     Callback = function(v)
         local minNum = 999
         for k, sel in pairs(v) do
@@ -2337,9 +2344,34 @@ grpFav:AddDropdown("FavMinRarity", {
                 if RARITY_ORDER[k] == minNum then State.favoriteMinRarity = k; break end
             end
         else
-            State.favoriteMinRarity = "Legendary"
+            State.favoriteMinRarity = "Common"
         end
     end,
+})
+grpFav:AddDropdown("FavMutations", {
+    Values = MUTATIONS, Default = {}, Multi = true, Text = "Mutations",
+    Tooltip = "Kosong = semua mutasi lolos",
+    Callback = function(v)
+        State.favMutations = {}
+        for k, sel in pairs(v) do
+            if sel then State.favMutations[k] = true end
+        end
+    end,
+})
+grpFav:AddInput("FavMinWeight", {
+    Text = "Min Weight", Default = "0", Numeric = true, Finished = true,
+    Tooltip = "0 = skip filter",
+    Callback = function(v) State.favMinWeight = tonumber(v) or 0 end,
+})
+grpFav:AddInput("FavMaxWeight", {
+    Text = "Max Weight", Default = "0", Numeric = true, Finished = true,
+    Tooltip = "0 = skip filter",
+    Callback = function(v) State.favMaxWeight = tonumber(v) or 0 end,
+})
+grpFav:AddInput("FavMinValue", {
+    Text = "Min Value (EarningRate)", Default = "0", Numeric = true, Finished = true,
+    Tooltip = "0 = skip filter",
+    Callback = function(v) State.favMinValue = tonumber(v) or 0 end,
 })
 grpFav:AddButton({ Text = "Favorite Now", Callback = function()
     pcall(runAutoFavorite); Notify("Favorite","Done!",2)
