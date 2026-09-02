@@ -119,9 +119,18 @@ CloseBtn2.Text="×"; CloseBtn2.TextColor3=Color3.fromRGB(220,80,80)
 CloseBtn2.TextSize=16; CloseBtn2.Font=Enum.Font.GothamBold; CloseBtn2.Parent=Header
 do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,5); c.Parent=CloseBtn2 end
 
+local CopyAllBtn = Instance.new("TextButton")
+CopyAllBtn.Size=UDim2.new(1,-20,0,26); CopyAllBtn.Position=UDim2.new(0,10,0,38)
+CopyAllBtn.BackgroundColor3=Color3.fromRGB(40,100,60); CopyAllBtn.BorderSizePixel=0
+CopyAllBtn.Text="COPY ALL NAMES"; CopyAllBtn.TextColor3=Color3.fromRGB(180,255,180)
+CopyAllBtn.TextSize=11; CopyAllBtn.Font=Enum.Font.GothamBold; CopyAllBtn.Parent=Panel
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=CopyAllBtn
+   local s=Instance.new("UIStroke"); s.Color=Color3.fromRGB(60,160,80); s.Thickness=1; s.Parent=CopyAllBtn
+end
+
 -- Status label (copy feedback)
 local StatusLbl = Instance.new("TextLabel")
-StatusLbl.Size=UDim2.new(1,-20,0,16); StatusLbl.Position=UDim2.new(0,10,0,38)
+StatusLbl.Size=UDim2.new(1,-20,0,16); StatusLbl.Position=UDim2.new(0,10,0,68)
 StatusLbl.BackgroundTransparency=1; StatusLbl.Text=""
 StatusLbl.TextColor3=Color3.fromRGB(100,220,100); StatusLbl.TextSize=10
 StatusLbl.Font=Enum.Font.Gotham; StatusLbl.TextXAlignment=Enum.TextXAlignment.Left
@@ -129,7 +138,7 @@ StatusLbl.Parent=Panel
 
 -- Scroll list
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size=UDim2.new(1,-10,1,-60); Scroll.Position=UDim2.new(0,5,0,56)
+Scroll.Size=UDim2.new(1,-10,1,-88); Scroll.Position=UDim2.new(0,5,0,84)
 Scroll.BackgroundTransparency=1; Scroll.BorderSizePixel=0
 Scroll.ScrollBarThickness=3; Scroll.ScrollBarImageColor3=Color3.fromRGB(60,60,80)
 Scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; Scroll.CanvasSize=UDim2.new(0,0,0,0)
@@ -288,5 +297,33 @@ end)
 
 RefreshBtn.MouseButton1Click:Connect(function() populate() end)
 CloseBtn2.MouseButton1Click:Connect(function() Panel.Visible = false end)
+
+CopyAllBtn.MouseButton1Click:Connect(function()
+    local backpack = LP.Backpack
+    local char = LP.Character
+    local names = {}
+    for _, t in ipairs(backpack:GetChildren()) do
+        if t:IsA("Tool") then table.insert(names, t.Name) end
+    end
+    if char then
+        for _, t in ipairs(char:GetChildren()) do
+            if t:IsA("Tool") then table.insert(names, t.Name .. " (equipped)") end
+        end
+    end
+    if #names == 0 then
+        StatusLbl.Text = "No tools found!"; clearStatus(); return
+    end
+    local text = table.concat(names, "\n")
+    local ok = false
+    pcall(function()
+        if type(setclipboard)=="function" then setclipboard(text); ok=true
+        elseif type(toclipboard)=="function" then toclipboard(text); ok=true end
+    end)
+    StatusLbl.Text = ok and ("✓ Copied " .. #names .. " names!") or "Printed to console"
+    print("=== ALL BACKPACK TOOLS ===")
+    print(text)
+    print("=== END ===")
+    clearStatus()
+end)
 
 print("[EggInspector] loaded — klik EGG INSPECTOR buat buka panel")
