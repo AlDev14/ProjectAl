@@ -1066,6 +1066,44 @@ task.spawn(function()
     end
 end)
 
+-- ============================================================
+-- AUTO FAVORITE PET — RE/PetSatchel/WriteFavourite
+-- Scan backpack pet by name + PET_RARITY_MAP
+-- ============================================================
+local function runAutoFavorite()
+    pcall(function()
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local remote = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
+        if not remote then warn("[AutoFavorite] WriteFavourite not found"); return end
+
+        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
+        local favCount = 0
+
+        -- Scan backpack — pet = ItemType Asset/Phone
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if not tool:IsA("Tool") then continue end
+            local itype = tool:GetAttribute("ItemType")
+            if itype ~= "Asset" and itype ~= "Phone" then continue end
+
+            -- Filter by rarity
+            local rarity = PET_RARITY_MAP[tool.Name]
+            local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
+            if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then continue end
+
+            local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
+            if not uid then continue end
+
+            pcall(function() remote:FireServer(uid, true) end)
+            favCount += 1
+            task.wait(0.05)
+        end
+
+        if favCount > 0 then print("[AutoFavorite] favorited:", favCount) end
+    end)
+end
+
 task.spawn(function()
     while true do
         task.wait(State.favoriteInterval or 30)
@@ -1075,53 +1113,6 @@ task.spawn(function()
     end
 end)
 
--- ============================================================
--- AUTO FAVORITE PET — RE/PetSatchel/WriteFavourite
--- ============================================================
-local function runAutoFavorite()
-    if not EggState then loadModules() end
-    if not EggState then return end
-    pcall(function()
-        local net = ReplicatedStorage:FindFirstChild("Packages")
-            and ReplicatedStorage.Packages:FindFirstChild("Networking")
-        if not net then return end
-        local remote = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
-        if not remote then warn("[AutoFavorite] WriteFavourite not found"); return end
-
-        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
-        local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
-        if type(owned) ~= "table" then return end
-
-        local favCount = 0
-        for uid, rec in pairs(owned) do
-            if type(uid) ~= "string" then continue end
-            -- Sudah hatched = punya pet (ada di satchel), bukan egg lagi
-            -- Filter by rarity
-            if minRarNum > 0 then
-                local rarNum = 0
-                if rec.Rarity and type(rec.Rarity) == "table" then
-                    rarNum = rec.Rarity.RarityNumber or 0
-                end
-                if rarNum > 0 and rarNum < minRarNum then continue end
-            end
-            pcall(function() remote:FireServer(uid, true) end)
-            favCount += 1
-            task.wait(0.05)
-        end
-
-        -- Favorite pet di satchel (asset satchel scan backpack)
-        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-            if not tool:IsA("Tool") then continue end
-            local itype = tool:GetAttribute("ItemType")
-            if itype ~= "Asset" and itype ~= "Phone" then continue end
-            local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
-            if not uid then continue end
-            pcall(function() remote:FireServer(uid, true) end)
-            favCount += 1
-            task.wait(0.05)
-        end
-
-        if favCount > 0 then print("[AutoFavorite] favorited:", favCount) end
     end)
 end
 -- ============================================================
