@@ -449,13 +449,11 @@ end)
 
 -- ============================================================
 -- FLOAT SYSTEM — client-side visual only (RenderStepped)
--- Smooth Y biar gak jumping, cuma lo yang lihat
+-- Direct offset tanpa lerp biar gak bouncing
 -- ============================================================
 local _floatConn = nil
-local _floatSmoothY = nil
 local function updateFloat()
     if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
-    _floatSmoothY = nil
     if not State.floatEnabled then return end
     _floatConn = RunService.RenderStepped:Connect(function()
         if not State.floatEnabled then return end
@@ -463,13 +461,12 @@ local function updateFloat()
         if not c then return end
         local hrp = c:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-        -- Smooth Y dari physics position biar gak jumpy
-        local physY = hrp.Position.Y
-        if not _floatSmoothY then _floatSmoothY = physY end
-        _floatSmoothY = _floatSmoothY * 0.85 + physY * 0.15
-        -- Apply offset visual-only
         local rot = hrp.CFrame - hrp.CFrame.Position
-        hrp.CFrame = CFrame.new(hrp.Position.X, _floatSmoothY + State.floatHeight, hrp.Position.Z) * rot
+        hrp.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y + State.floatHeight,
+            hrp.Position.Z
+        ) * rot
     end)
 end
 
