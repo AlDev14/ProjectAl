@@ -271,34 +271,21 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================
--- FLOAT SYSTEM
+-- FLOAT SYSTEM — client-side visual only (RenderStepped)
+-- Cuma lo yang lihat, tidak mempengaruhi physics/server
 -- ============================================================
 local _floatConn = nil
 local function updateFloat()
     if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
     if not State.floatEnabled then return end
-    _floatConn = RunService.Heartbeat:Connect(function()
+    _floatConn = RunService.RenderStepped:Connect(function()
         if not State.floatEnabled then return end
         local c = LocalPlayer.Character
         if not c then return end
         local hrp = c:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-        -- Raycast ke bawah cari ground
-        local origin    = hrp.Position
-        local direction = Vector3.new(0, -50, 0)
-        local params    = RaycastParams.new()
-        params.FilterDescendantsInstances = {c}
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        local result = Workspace:Raycast(origin, direction, params)
-        local groundY = result and result.Position.Y or (origin.Y - 3)
-        local targetY = groundY + State.floatHeight
-        -- Lock Y, cancel vertical velocity
-        if math.abs(hrp.Position.Y - targetY) > 0.1 then
-            hrp.CFrame = CFrame.new(hrp.Position.X, targetY, hrp.Position.Z)
-                * CFrame.fromMatrix(Vector3.zero, hrp.CFrame.RightVector, Vector3.new(0,1,0))
-        end
-        local vel = hrp.AssemblyLinearVelocity
-        hrp.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z)
+        -- Geser Y ke atas secara visual (client-only, sebelum render)
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, State.floatHeight, 0)
     end)
 end
 
@@ -956,7 +943,7 @@ secMain:AddToggle({
             Notify("SAE", "Farm stopped.", "info", 2)
             task.delay(0.3, function()
                 pcall(function()
-                    local h2 = hum(); if h2 then h2.Health = 0 end
+                    -- Health=0 dihapus, biarkan karakter jalan normal
                 end)
             end)
         end
