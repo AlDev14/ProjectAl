@@ -451,15 +451,20 @@ local function walkTo(goal, timeout, isReturning, checkFn)
             h2:Move(Vector3.zero, false)
             r.AssemblyLinearVelocity  = Vector3.zero
             r.AssemblyAngularVelocity = Vector3.zero
+            -- Snap CFrame tepat ke goal biar gak kelewatan
+            pcall(function()
+                r.CFrame = CFrame.new(goal) * (r.CFrame - r.CFrame.Position)
+            end)
             if isReturning then
                 pcall(function() r.CFrame = CFrame.new(START_POS) end)
             end
             break
         end
 
-        local brake = math.clamp(speed * 0.3, 15, 80)
+        -- Brake zone lebih besar biar gak overshoot
+        local brake = math.clamp(speed * 0.5, 20, 100)
         if dist <= brake then
-            h2.WalkSpeed = math.max(16, speed * (dist/brake)^2)
+            h2.WalkSpeed = math.max(16, speed * (dist/brake)^1.5)
         else
             h2.WalkSpeed = speed
         end
