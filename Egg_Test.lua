@@ -77,6 +77,12 @@ local State = {
     placePetInterval  = 5,
     -- No Knockback
     noKnockback       = false,
+    -- Backpack threshold auto place
+    placeThreshold    = 50,
+    _placing          = false,
+    -- Collect Money
+    collectEnabled    = false,
+    collectInterval   = 60,
     -- Auto Hatch (independent loop)
     hatchEnabled      = false,
     hatchInterval     = 3,
@@ -93,7 +99,8 @@ local State = {
 }
 
 -- Base teleport koordinat
-local START_POS = Vector3.new(547.89, 70.58, -357.39)
+local START_POS = Vector3.new(519.155, 70.576, -356.103)
+local SAFE_POS  = Vector3.new(519.155, 70.576, -356.103)
 
 -- ============================================================
 -- HELPERS
@@ -841,16 +848,27 @@ local function runAutoHatch()
         local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
         if type(owned) ~= "table" then return end
 
+        local hatched = 0
         for uid, rec in pairs(owned) do
+            if type(uid) ~= "string" then continue end
+            -- Hanya hatch egg yang sudah di-place (Placement != nil)
+            if rec.Placement == nil then continue end
             if AskHatch then
                 pcall(function() AskHatch:InvokeServer(uid) end)
                 task.wait(0.05)
             end
             if AskFinishHatch then
-                pcall(function() AskFinishHatch:InvokeServer(uid) end)
-                task.wait(0.02)
+                local ok, r1, r2, petUid = pcall(function()
+                    return AskFinishHatch:InvokeServer(uid)
+                end)
+                if ok and r1 == true then
+                    hatched += 1
+                    print("[AutoHatch] hatched uid:", uid:sub(1,8), "pet:", tostring(petUid or r2))
+                end
+                task.wait(0.05)
             end
         end
+        if hatched > 0 then print("[AutoHatch] total hatched:", hatched) end
     end)
 end
 
@@ -860,6 +878,37 @@ task.spawn(function()
         if State.hatchEnabled then
             if not EggState then loadModules() end
             pcall(runAutoHatch)
+        end
+    end
+end)
+
+-- ============================================================
+-- COLLECT MONEY — RF/AwayEarnings/AskCollect (confirmed rspy)
+-- ============================================================
+local function runCollectMoney()
+    pcall(function()
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local remote = net:FindFirstChild("RF/AwayEarnings/AskCollect")
+        if not remote then warn("[CollectMoney] remote not found"); return end
+        local ok, r1, r2, data = pcall(function()
+            return remote:InvokeServer({Kind = "Claim"})
+        end)
+        if ok and r1 == true then
+            local amount = data and data.AwardedAmount or 0
+            print(string.format("[CollectMoney] claimed: $%.0f", amount))
+        else
+            warn("[CollectMoney] failed:", tostring(r1))
+        end
+    end)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(State.collectInterval or 60)
+        if State.collectEnabled then
+            pcall(runCollectMoney)
         end
     end
 end)
@@ -1483,6 +1532,22 @@ grpSell:AddDropdown("SellMaxRarity", {
 })
 grpSell:AddButton({ Text = "Sell Now", Func = function()
     loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
+end })
+
+local grpCollect = Tabs.Store:AddRightGroupbox("Collect Money")
+
+grpCollect:AddToggle("CollectEnable", {
+    Text    = "Auto Collect",
+    Default = false,
+    Tooltip = "Claim offline earnings tiap X detik",
+    Callback = function(v) State.collectEnabled = v end,
+})
+grpCollect:AddSlider("CollectInterval", {
+    Text = "Interval (s)", Default = 60, Min = 10, Max = 300, Rounding = 0,
+    Callback = function(v) State.collectInterval = v end,
+})
+grpCollect:AddButton({ Text = "Collect Now", Func = function()
+    pcall(runCollectMoney); Notify("Collect","Claimed!",2)
 end })
 
 -- ── CONFIG ─────────────────────────────────────────────────────
