@@ -1030,615 +1030,21 @@ end)
 
 
 
--- ============================================================
--- CUSTOM UI — no external dependency
--- ============================================================
-local Players      = game:GetService("Players")
-local UIS          = game:GetService("UserInputService")
-local LP           = Players.LocalPlayer
-local PG           = LP:WaitForChild("PlayerGui")
-
--- Hapus UI lama
-pcall(function()
-    local old = PG:FindFirstChild("SAE_UI")
-    if old then old:Destroy() end
-end)
-
-local SG = Instance.new("ScreenGui")
-SG.Name = "SAE_UI"
-SG.ResetOnSpawn = false
-SG.IgnoreGuiInset = true
-SG.DisplayOrder = 999999
-SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-SG.Parent = (type(gethui)=="function" and pcall(gethui) and gethui()) or
-            (type(syn)=="table" and syn.protect_gui and syn.protect_gui(SG) and SG) or
-            PG
 
 -- ============================================================
--- HELPERS
+-- LINORIA UI
 -- ============================================================
-local function mkFrame(props)
-    local f = Instance.new("Frame")
-    for k,v in pairs(props or {}) do f[k]=v end
-    f.BorderSizePixel = 0
-    return f
-end
-local function mkLabel(props)
-    local l = Instance.new("TextLabel")
-    l.BackgroundTransparency = 1
-    l.BorderSizePixel = 0
-    l.Font = Enum.Font.GothamBold
-    l.TextColor3 = Color3.fromRGB(235,235,240)
-    for k,v in pairs(props or {}) do l[k]=v end
-    return l
-end
-local function mkBtn(props)
-    local b = Instance.new("TextButton")
-    b.BorderSizePixel = 0
-    b.Font = Enum.Font.GothamBold
-    b.AutoButtonColor = false
-    for k,v in pairs(props or {}) do b[k]=v end
-    return b
-end
-local function corner(r, p)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 6)
-    c.Parent = p
-    return c
-end
-local function stroke(t, col, p)
-    local s = Instance.new("UIStroke")
-    s.Thickness = t or 1
-    s.Color = col or Color3.fromRGB(70,70,80)
-    s.Parent = p
-end
-local function listLayout(p, pad)
-    local l = Instance.new("UIListLayout")
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.Padding = UDim.new(0, pad or 4)
-    l.Parent = p
-    return l
-end
-
--- ============================================================
--- COLORS
--- ============================================================
-local C = {
-    BG      = Color3.fromRGB(15,15,20),
-    BG2     = Color3.fromRGB(22,22,30),
-    BG3     = Color3.fromRGB(30,30,40),
-    Accent  = Color3.fromRGB(80,160,255),
-    AccentD = Color3.fromRGB(50,110,200),
-    Text    = Color3.fromRGB(235,235,240),
-    TextDim = Color3.fromRGB(140,140,155),
-    Green   = Color3.fromRGB(80,220,120),
-    Red     = Color3.fromRGB(220,80,80),
-    Stroke  = Color3.fromRGB(55,55,70),
-}
-
--- ============================================================
--- MAIN WINDOW
--- ============================================================
-local W = 400
-local H = 320
-
-local Main = mkFrame({
-    Size = UDim2.fromOffset(W, H),
-    Position = UDim2.new(0.5,-W/2,0.5,-H/2),
-    BackgroundColor3 = C.BG,
-    Parent = SG,
-})
-corner(10, Main)
-stroke(1.5, C.Stroke, Main)
-
--- Title bar
-local TitleBar = mkFrame({
-    Size = UDim2.new(1,0,0,36),
-    BackgroundColor3 = C.BG2,
-    Parent = Main,
-})
-corner(10, TitleBar)
--- Fix bottom corners of titlebar
-mkFrame({
-    Size = UDim2.new(1,0,0.5,0),
-    Position = UDim2.new(0,0,0.5,0),
-    BackgroundColor3 = C.BG2,
-    Parent = TitleBar,
-})
-
-local TitleLbl = mkLabel({
-    Size = UDim2.new(1,-80,1,0),
-    Position = UDim2.new(0,12,0,0),
-    Text = "Steal An Egg  v2.0",
-    TextSize = 14,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Parent = TitleBar,
-})
-
-local CloseBtn = mkBtn({
-    Size = UDim2.fromOffset(24,24),
-    Position = UDim2.new(1,-30,0.5,-12),
-    Text = "×",
-    TextSize = 18,
-    TextColor3 = C.TextDim,
-    BackgroundColor3 = C.BG3,
-    Parent = TitleBar,
-})
-corner(6, CloseBtn)
-
--- ============================================================
--- DRAG
--- ============================================================
-do
-    local drag, ds, mp = false
-    TitleBar.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            drag = true; ds = i.Position; mp = Main.Position
-            i.Changed:Connect(function()
-                if i.UserInputState == Enum.UserInputState.End then drag=false end
-            end)
-        end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if not drag then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch then
-            local d = i.Position - ds
-            Main.Position = UDim2.new(mp.X.Scale, mp.X.Offset+d.X, mp.Y.Scale, mp.Y.Offset+d.Y)
-        end
-    end)
-end
-
--- ============================================================
--- TABS
--- ============================================================
-local TabBar = mkFrame({
-    Size = UDim2.new(1,-2,0,28),
-    Position = UDim2.new(0,1,0,37),
-    BackgroundColor3 = C.BG2,
-    Parent = Main,
-})
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection = Enum.FillDirection.Horizontal
-TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Padding = UDim.new(0,2)
-TabLayout.Parent = TabBar
-
-local Content = mkFrame({
-    Size = UDim2.new(1,0,1,-68),
-    Position = UDim2.new(0,0,0,68),
-    BackgroundTransparency = 1,
-    Parent = Main,
-})
-
-local tabs = {}
-local activeTab = nil
-
-local function mkTab(name)
-    local btn = mkBtn({
-        Size = UDim2.fromOffset(88, 28),
-        Text = name,
-        TextSize = 12,
-        TextColor3 = C.TextDim,
-        BackgroundColor3 = C.BG2,
-        LayoutOrder = #tabs+1,
-        Parent = TabBar,
-    })
-
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1,-4,1,-4)
-    scroll.Position = UDim2.new(0,2,0,2)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 3
-    scroll.ScrollBarImageColor3 = C.Stroke
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.CanvasSize = UDim2.new(0,0,0,0)
-    scroll.Visible = false
-    scroll.Parent = Content
-
-    local layout = listLayout(scroll, 4)
-    local pad = Instance.new("UIPadding", scroll)
-    pad.PaddingLeft = UDim.new(0,6)
-    pad.PaddingRight = UDim.new(0,6)
-    pad.PaddingTop = UDim.new(0,4)
-
-    local t = {btn=btn, scroll=scroll}
-    table.insert(tabs, t)
-
-    btn.MouseButton1Click:Connect(function()
-        for _, tab in ipairs(tabs) do
-            tab.scroll.Visible = false
-            tab.btn.TextColor3 = C.TextDim
-            tab.btn.BackgroundColor3 = C.BG2
-        end
-        scroll.Visible = true
-        btn.TextColor3 = C.Text
-        btn.BackgroundColor3 = C.BG3
-        activeTab = t
-    end)
-
-    return t
-end
-
--- ============================================================
--- ELEMENT BUILDERS
--- ============================================================
-local function addSection(tab, title)
-    local f = mkFrame({
-        Size = UDim2.new(1,-2,0,22),
-        BackgroundColor3 = C.BG3,
-        Parent = tab.scroll,
-    })
-    corner(4, f)
-    local l = mkLabel({
-        Size = UDim2.new(1,-8,1,0),
-        Position = UDim2.new(0,8,0,0),
-        Text = title,
-        TextSize = 11,
-        TextColor3 = C.Accent,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-    return f
-end
-
-local function addToggle(tab, title, default, cb)
-    local f = mkFrame({
-        Size = UDim2.new(1,-2,0,30),
-        BackgroundColor3 = C.BG2,
-        Parent = tab.scroll,
-    })
-    corner(6, f)
-
-    local lbl = mkLabel({
-        Size = UDim2.new(1,-50,1,0),
-        Position = UDim2.new(0,10,0,0),
-        Text = title,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-
-    local state = default or false
-    local pill = mkFrame({
-        Size = UDim2.fromOffset(36,18),
-        Position = UDim2.new(1,-44,0.5,-9),
-        BackgroundColor3 = state and C.Green or C.BG3,
-        Parent = f,
-    })
-    corner(9, pill)
-    stroke(1, C.Stroke, pill)
-
-    local dot = mkFrame({
-        Size = UDim2.fromOffset(14,14),
-        Position = state and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7),
-        BackgroundColor3 = Color3.fromRGB(255,255,255),
-        Parent = pill,
-    })
-    corner(7, dot)
-
-    local function setState(v)
-        state = v
-        pill.BackgroundColor3 = v and C.Green or C.BG3
-        dot.Position = v and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7)
-        pcall(cb, v)
-    end
-
-    local clickBtn = mkBtn({
-        Size = UDim2.new(1,0,1,0),
-        BackgroundTransparency = 1,
-        Text = "",
-        Parent = f,
-    })
-    clickBtn.MouseButton1Click:Connect(function() setState(not state) end)
-
-    return { Set = setState, Get = function() return state end }
-end
-
-local function addSlider(tab, title, min, max, default, step, cb)
-    local f = mkFrame({
-        Size = UDim2.new(1,-2,0,44),
-        BackgroundColor3 = C.BG2,
-        Parent = tab.scroll,
-    })
-    corner(6, f)
-
-    local val = default or min
-    local lbl = mkLabel({
-        Size = UDim2.new(1,-8,0,18),
-        Position = UDim2.new(0,10,0,4),
-        Text = title .. ": " .. tostring(val),
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-
-    local track = mkFrame({
-        Size = UDim2.new(1,-20,0,6),
-        Position = UDim2.new(0,10,0,26),
-        BackgroundColor3 = C.BG3,
-        Parent = f,
-    })
-    corner(3, track)
-
-    local fill = mkFrame({
-        Size = UDim2.new((val-min)/(max-min),0,1,0),
-        BackgroundColor3 = C.Accent,
-        Parent = track,
-    })
-    corner(3, fill)
-
-    local function setVal(v)
-        v = math.clamp(math.floor(v/step+0.5)*step, min, max)
-        val = v
-        fill.Size = UDim2.new((v-min)/(max-min),0,1,0)
-        lbl.Text = title .. ": " .. tostring(v)
-        pcall(cb, v)
-    end
-
-    local dragging = false
-    local hitbox = mkBtn({
-        Size = UDim2.new(1,0,0,16),
-        Position = UDim2.new(0,0,0,20),
-        BackgroundTransparency = 1,
-        Text = "",
-        Parent = f,
-    })
-    hitbox.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-        end
-    end)
-    hitbox.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if not dragging then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch then
-            local abs = track.AbsolutePosition
-            local sz  = track.AbsoluteSize
-            local pct = math.clamp((i.Position.X - abs.X) / sz.X, 0, 1)
-            setVal(min + pct*(max-min))
-        end
-    end)
-
-    return { Set = setVal, Get = function() return val end }
-end
-
-local function addButton(tab, title, cb)
-    local f = mkBtn({
-        Size = UDim2.new(1,-2,0,28),
-        Text = title,
-        TextSize = 12,
-        TextColor3 = C.Text,
-        BackgroundColor3 = C.AccentD,
-        Parent = tab.scroll,
-    })
-    corner(6, f)
-    f.MouseButton1Click:Connect(function() pcall(cb) end)
-    f.MouseEnter:Connect(function() f.BackgroundColor3 = C.Accent end)
-    f.MouseLeave:Connect(function() f.BackgroundColor3 = C.AccentD end)
-    return f
-end
-
-local function addDropdown(tab, title, options, default, multi, cb)
-    local state = default or (multi and {} or options[1])
-    local open = false
-
-    local f = mkFrame({
-        Size = UDim2.new(1,-2,0,30),
-        BackgroundColor3 = C.BG2,
-        Parent = tab.scroll,
-    })
-    corner(6, f)
-
-    local lbl = mkLabel({
-        Size = UDim2.new(1,-8,0,14),
-        Position = UDim2.new(0,10,0,2),
-        Text = title,
-        TextSize = 10,
-        TextColor3 = C.TextDim,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-
-    local valLbl = mkLabel({
-        Size = UDim2.new(1,-30,0,14),
-        Position = UDim2.new(0,10,0,14),
-        Text = multi and "Select..." or tostring(state),
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-
-    local arrow = mkLabel({
-        Size = UDim2.fromOffset(16,16),
-        Position = UDim2.new(1,-22,0.5,-8),
-        Text = "▼",
-        TextSize = 10,
-        TextColor3 = C.TextDim,
-        Parent = f,
-    })
-
-    -- Popup (parent ke SG biar gak ketimpa)
-    local popup = mkFrame({
-        Size = UDim2.fromOffset(f.AbsoluteSize.X, 0),
-        BackgroundColor3 = C.BG2,
-        Visible = false,
-        ZIndex = 10,
-        Parent = SG,
-    })
-    corner(6, popup)
-    stroke(1, C.Stroke, popup)
-
-    local popScroll = Instance.new("ScrollingFrame")
-    popScroll.Size = UDim2.new(1,0,1,0)
-    popScroll.BackgroundTransparency = 1
-    popScroll.BorderSizePixel = 0
-    popScroll.ScrollBarThickness = 3
-    popScroll.ScrollBarImageColor3 = C.Stroke
-    popScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    popScroll.CanvasSize = UDim2.new(0,0,0,0)
-    popScroll.ZIndex = 10
-    popScroll.Parent = popup
-    listLayout(popScroll, 2)
-
-    local selected = {}
-    if multi and type(state) == "table" then
-        for k,v in pairs(state) do
-            if v then selected[k] = true end
-        end
-    end
-
-    local optBtns = {}
-    for _, opt in ipairs(options) do
-        local ob = mkBtn({
-            Size = UDim2.new(1,0,0,24),
-            Text = opt,
-            TextSize = 11,
-            TextColor3 = C.Text,
-            BackgroundColor3 = C.BG3,
-            ZIndex = 11,
-            Parent = popScroll,
-        })
-        corner(4, ob)
-        table.insert(optBtns, {btn=ob, opt=opt})
-
-        ob.MouseButton1Click:Connect(function()
-            if multi then
-                selected[opt] = not selected[opt]
-                ob.BackgroundColor3 = selected[opt] and C.AccentD or C.BG3
-                ob.TextColor3 = selected[opt] and C.Text or C.TextDim
-                local arr = {}
-                for k,v in pairs(selected) do if v then table.insert(arr,k) end end
-                local display = #arr == 0 and "Select..." or table.concat(arr, ", "):sub(1,30)
-                valLbl.Text = display
-                pcall(cb, selected)
-            else
-                state = opt
-                valLbl.Text = opt
-                for _, o in ipairs(optBtns) do
-                    o.btn.BackgroundColor3 = o.opt == opt and C.AccentD or C.BG3
-                end
-                open = false
-                popup.Visible = false
-                arrow.Text = "▼"
-                pcall(cb, opt)
-            end
-        end)
-    end
-
-    -- Toggle popup
-    local maxH = math.min(#options * 26, 160)
-    local clickArea = mkBtn({
-        Size = UDim2.new(1,0,1,0),
-        BackgroundTransparency = 1,
-        Text = "",
-        Parent = f,
-    })
-    clickArea.MouseButton1Click:Connect(function()
-        open = not open
-        if open then
-            local abs = f.AbsolutePosition
-            local sz  = f.AbsoluteSize
-            popup.Size = UDim2.fromOffset(sz.X, maxH)
-            popup.Position = UDim2.fromOffset(abs.X, abs.Y + sz.Y + 2)
-            popup.Visible = true
-            arrow.Text = "▲"
-        else
-            popup.Visible = false
-            arrow.Text = "▼"
-        end
-    end)
-
-    CloseBtn.MouseButton1Click:Connect(function() popup.Visible = false end)
-
-    return {
-        Get = function() return multi and selected or state end,
-        Set = function(v)
-            if not multi then state = v; valLbl.Text = v end
-        end,
-    }
-end
-
-local function addInput(tab, title, default, cb)
-    local f = mkFrame({
-        Size = UDim2.new(1,-2,0,44),
-        BackgroundColor3 = C.BG2,
-        Parent = tab.scroll,
-    })
-    corner(6, f)
-
-    mkLabel({
-        Size = UDim2.new(1,-8,0,16),
-        Position = UDim2.new(0,10,0,4),
-        Text = title,
-        TextSize = 11,
-        TextColor3 = C.TextDim,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = f,
-    })
-
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1,-20,0,18)
-    box.Position = UDim2.new(0,10,0,22)
-    box.BackgroundColor3 = C.BG3
-    box.BorderSizePixel = 0
-    box.Text = tostring(default or "")
-    box.TextSize = 11
-    box.TextColor3 = C.Text
-    box.Font = Enum.Font.Gotham
-    box.ClearTextOnFocus = false
-    box.Parent = f
-    corner(4, box)
-
-    box.FocusLost:Connect(function() pcall(cb, box.Text) end)
-    return box
-end
+local repo = "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/"
+local Library     = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
 local function Notify(title, text, dur)
-    task.spawn(function()
-        local nf = mkFrame({
-            Size = UDim2.fromOffset(240, 52),
-            Position = UDim2.new(1,-250,1,-60),
-            BackgroundColor3 = C.BG2,
-            Parent = SG,
-        })
-        corner(8, nf)
-        stroke(1, C.Accent, nf)
-
-        mkLabel({
-            Size = UDim2.new(1,-10,0,20),
-            Position = UDim2.new(0,8,0,6),
-            Text = title,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = nf,
-        })
-        mkLabel({
-            Size = UDim2.new(1,-10,0,16),
-            Position = UDim2.new(0,8,0,26),
-            Text = text,
-            TextSize = 10,
-            TextColor3 = C.TextDim,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = nf,
-        })
-        task.wait(dur or 3)
-        nf:Destroy()
+    pcall(function()
+        Library:Notify(title .. "\n" .. text, dur or 3)
     end)
 end
 
--- ============================================================
--- BUILD TABS
--- ============================================================
 local RARITIES = {
     "Common","Uncommon","Rare","Epic","Legendary","Mythic",
     "SuperRare","Exotic","Limited","Divine","Secret","Titan",
@@ -1646,164 +1052,245 @@ local RARITIES = {
     "Eternal","Brainrot","Mythical","Exclusive"
 }
 
-local tFarm   = mkTab("Farm")
-local tStore  = mkTab("Store")
-local tConfig = mkTab("Config")
+local Window = Library:CreateWindow({
+    Title     = "Steal An Egg  v2.0",
+    Center    = true,
+    AutoShow  = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2,
+})
 
--- Activate Farm tab
-tFarm.scroll.Visible = true
-tFarm.btn.TextColor3 = C.Text
-tFarm.btn.BackgroundColor3 = C.BG3
+local Tabs = {
+    Farm   = Window:AddTab("Farm"),
+    Store  = Window:AddTab("Store"),
+    Config = Window:AddTab("Config"),
+}
 
 -- ── FARM ─────────────────────────────────────────────────────
-addSection(tFarm, "Auto Steal")
-addToggle(tFarm, "Auto Steal", false, function(v)
-    State.running = v
-    if v then
-        loadModules()
-        doHumanoidBypass()
-        Notify("SAE", "Farm started!", 2)
-        task.spawn(function()
-            while State.running do
-                farmCycle()
-                task.wait(0.05)
-            end
-        end)
-    else
-        State.running = false; State.busy = false; State.lockedRecord = nil
-        if _camConn   then _camConn:Disconnect();   _camConn   = nil end
-        if _speedConn then _speedConn:Disconnect(); _speedConn = nil end
-        Notify("SAE", "Farm stopped.", 2)
-        -- Restore humanoid asli via LoadCharacter
-        task.delay(0.3, function()
-            pcall(function() LocalPlayer:LoadCharacter() end)
-        end)
-    end
-end)
-addToggle(tFarm, "Anti-Guard", true,  function(v) State.antiGuard = v end)
-addToggle(tFarm, "Bat Aura",   false, function(v) State.batAura   = v end)
-addToggle(tFarm, "Animation",  true,  function(v) State.animEnabled=v; updateAnim() end)
-addToggle(tFarm, "Float (visual)", false, function(v) State.floatEnabled=v; updateFloat() end)
-addSlider(tFarm, "Walk Speed", 16, 500, 120, 1,  function(v) State.speed = v end)
-addSlider(tFarm, "Float Height",1, 10,  3,   1,  function(v) State.floatHeight = v end)
+local grpSteal = Tabs.Farm:AddLeftGroupbox("Auto Steal")
 
-addSection(tFarm, "Auto Place")
-addToggle(tFarm, "Enable Auto Place", false, function(v)
-    State.placeEnabled = v; if v then loadModules() end
-end)
-addSlider(tFarm, "Place Interval (s)", 1, 30, 5, 1, function(v) State.placeInterval = v end)
-addDropdown(tFarm, "Min Rarity Place", RARITIES, "Common", false,
-    function(v) State.placeMinRarity = v end)
-addButton(tFarm, "Place Now", function()
-    loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2)
-end)
-
-addSection(tFarm, "Auto Hatch")
-addToggle(tFarm, "Enable Auto Hatch", false, function(v)
-    State.hatchEnabled = v; if v then loadModules() end
-end)
-addSlider(tFarm, "Hatch Interval (s)", 1, 30, 3, 1, function(v) State.hatchInterval = v end)
-addButton(tFarm, "Hatch Now", function()
-    loadModules(); pcall(runAutoHatch); Notify("Hatch","Triggered!",2)
-end)
-
-addSection(tFarm, "ESP")
-addToggle(tFarm, "Egg ESP", false, function(v)
-    State.espEnabled = v
-    if not v then for uid in pairs(EspHighlights) do clearESP(uid) end end
-end)
-
-addSection(tFarm, "Rarity Filter")
-addDropdown(tFarm, "Target Rarities", RARITIES, {}, true, function(v)
-    State.targetRarities = v
-end)
-
-addSection(tFarm, "Value Filter")
-addInput(tFarm, "Min Earning Rate", "0", function(v) State.minEarningRate = tonumber(v) or 0 end)
-addInput(tFarm, "Min Weight",       "0", function(v) State.minModelWeight = tonumber(v) or 0 end)
-addInput(tFarm, "Max Weight",       "0", function(v)
-    local n = tonumber(v) or 0
-    State.maxModelWeight = n == 0 and 999999999 or n
-end)
-
--- ── STORE ─────────────────────────────────────────────────────
-addSection(tStore, "Auto Sell")
-addToggle(tStore, "Enable Auto Sell", false, function(v)
-    State.sellEnabled = v; if v then loadModules() end
-end)
-addToggle(tStore, "Sell Every Pet", false, function(v) State.sellAll = v end)
-addSlider(tStore, "Sell Interval (s)", 1, 60, 5, 1, function(v) State.sellInterval = v end)
-addDropdown(tStore, "Sell Max Rarity", RARITIES, "Epic", false,
-    function(v) State.sellMaxRarity = v end)
-addButton(tStore, "Sell Now", function()
-    loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
-end)
-
--- ── CONFIG ────────────────────────────────────────────────────
-addSection(tConfig, "Configuration")
-addButton(tConfig, "Save Config", function()
-    pcall(function()
-        if writefile then writefile("SAE_test.json", game:GetService("HttpService"):JSONEncode({
-            speed=State.speed, antiGuard=State.antiGuard,
-            sellMaxRarity=State.sellMaxRarity, placeMinRarity=State.placeMinRarity,
-        })) end
-    end)
-    Notify("Config","Saved!",2)
-end)
-addButton(tConfig, "Load Config", function()
-    pcall(function()
-        if readfile and isfile and isfile("SAE_test.json") then
-            local d = game:GetService("HttpService"):JSONDecode(readfile("SAE_test.json"))
-            if d.speed then State.speed = d.speed end
-            if d.antiGuard ~= nil then State.antiGuard = d.antiGuard end
-            if d.sellMaxRarity then State.sellMaxRarity = d.sellMaxRarity end
-            if d.placeMinRarity then State.placeMinRarity = d.placeMinRarity end
-        end
-    end)
-    Notify("Config","Loaded!",2)
-end)
-
--- ============================================================
--- CLOSE + FLOAT TOGGLE BUTTON
--- ============================================================
-CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = not Main.Visible
-end)
-
--- Floating toggle button
-local fb = mkBtn({
-    Size = UDim2.fromOffset(36,36),
-    Position = UDim2.new(0,8,0.5,-18),
-    Text = "S",
-    TextSize = 14,
-    TextColor3 = C.Text,
-    BackgroundColor3 = C.BG2,
-    Parent = SG,
-})
-corner(18, fb)
-stroke(1.5, C.Accent, fb)
-fb.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
-
--- Drag float btn
-do
-    local drag, ds, fp, dist = false
-    fb.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            drag=true; ds=i.Position; fp=fb.Position; dist=0
-            i.Changed:Connect(function()
-                if i.UserInputState==Enum.UserInputState.End then drag=false end
+grpSteal:AddToggle("AutoSteal", {
+    Text    = "Auto Steal",
+    Default = false,
+    Tooltip = "Start / stop auto farm",
+    Callback = function(v)
+        State.running = v
+        if v then
+            loadModules()
+            doHumanoidBypass()
+            Notify("SAE", "Farm started!", 2)
+            task.spawn(function()
+                while State.running do
+                    farmCycle()
+                    task.wait(0.05)
+                end
+            end)
+        else
+            State.running = false; State.busy = false; State.lockedRecord = nil
+            if _camConn   then _camConn:Disconnect();   _camConn   = nil end
+            if _speedConn then _speedConn:Disconnect(); _speedConn = nil end
+            Notify("SAE", "Farm stopped.", 2)
+            task.delay(0.3, function()
+                pcall(function() LocalPlayer:LoadCharacter() end)
             end)
         end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if not drag then return end
-        if i.UserInputType==Enum.UserInputType.MouseMovement
-        or i.UserInputType==Enum.UserInputType.Touch then
-            local d = i.Position-ds; dist=d.Magnitude
-            fb.Position = UDim2.new(fp.X.Scale,fp.X.Offset+d.X,fp.Y.Scale,fp.Y.Offset+d.Y)
-        end
-    end)
-end
+    end,
+})
 
-Notify("Steal An Egg","v2.0 loaded!",3)
+grpSteal:AddToggle("AntiGuard", {
+    Text    = "Anti-Guard",
+    Default = true,
+    Tooltip = "Speed 1000 when returning",
+    Callback = function(v) State.antiGuard = v end,
+})
+
+grpSteal:AddToggle("BatAura", {
+    Text    = "Bat Aura",
+    Default = false,
+    Callback = function(v) State.batAura = v end,
+})
+
+grpSteal:AddSlider("WalkSpeed", {
+    Text    = "Walk Speed",
+    Default = 120,
+    Min     = 16,
+    Max     = 500,
+    Rounding = 0,
+    Callback = function(v) State.speed = v end,
+})
+
+-- Right side: visual
+local grpVisual = Tabs.Farm:AddRightGroupbox("Visual")
+
+grpVisual:AddToggle("FloatVis", {
+    Text    = "Float (visual)",
+    Default = false,
+    Tooltip = "Client-side float, cuma lo yang liat",
+    Callback = function(v) State.floatEnabled = v; updateFloat() end,
+})
+
+grpVisual:AddSlider("FloatHeight", {
+    Text    = "Float Height",
+    Default = 3,
+    Min     = 1,
+    Max     = 10,
+    Rounding = 0,
+    Callback = function(v) State.floatHeight = v end,
+})
+
+grpVisual:AddToggle("AnimToggle", {
+    Text    = "Animation",
+    Default = true,
+    Tooltip = "Off = R6 tegak diam",
+    Callback = function(v) State.animEnabled = v; updateAnim() end,
+})
+
+grpVisual:AddToggle("EggESP", {
+    Text    = "Egg ESP",
+    Default = false,
+    Callback = function(v)
+        State.espEnabled = v
+        if not v then for uid in pairs(EspHighlights) do clearESP(uid) end end
+    end,
+})
+
+-- Place Egg
+local grpPlace = Tabs.Farm:AddLeftGroupbox("Auto Place Egg")
+
+grpPlace:AddToggle("PlaceEgg", {
+    Text    = "Enable",
+    Default = false,
+    Callback = function(v) State.placeEnabled = v; if v then loadModules() end end,
+})
+
+grpPlace:AddSlider("PlaceInterval", {
+    Text    = "Interval (s)",
+    Default = 5, Min = 1, Max = 30, Rounding = 0,
+    Callback = function(v) State.placeInterval = v end,
+})
+
+grpPlace:AddDropdown("PlaceMinRarity", {
+    Values  = RARITIES,
+    Default = 1,
+    Text    = "Min Rarity",
+    Callback = function(v) State.placeMinRarity = v end,
+})
+
+grpPlace:AddButton({
+    Text = "Place Now",
+    Func = function() loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2) end,
+})
+
+-- Hatch
+local grpHatch = Tabs.Farm:AddRightGroupbox("Auto Hatch")
+
+grpHatch:AddToggle("HatchEgg", {
+    Text    = "Enable",
+    Default = false,
+    Callback = function(v) State.hatchEnabled = v; if v then loadModules() end end,
+})
+
+grpHatch:AddSlider("HatchInterval", {
+    Text    = "Interval (s)",
+    Default = 3, Min = 1, Max = 30, Rounding = 0,
+    Callback = function(v) State.hatchInterval = v end,
+})
+
+grpHatch:AddButton({
+    Text = "Hatch Now",
+    Func = function() loadModules(); pcall(runAutoHatch); Notify("Hatch","Triggered!",2) end,
+})
+
+-- Rarity Filter
+local grpRarity = Tabs.Farm:AddLeftGroupbox("Rarity Filter")
+
+grpRarity:AddDropdown("FarmRarities", {
+    Values  = RARITIES,
+    Default = 1,
+    Multi   = true,
+    Text    = "Target Rarities",
+    Tooltip = "Kosong = steal semua",
+    Callback = function(v)
+        State.targetRarities = {}
+        for k, sel in pairs(v) do
+            if sel then State.targetRarities[k] = true end
+        end
+    end,
+})
+
+-- Value Filter
+local grpVal = Tabs.Farm:AddRightGroupbox("Value Filter")
+
+grpVal:AddInput("MinEarning", {
+    Default     = "0",
+    Numeric     = true,
+    Finished    = true,
+    Text        = "Min Earning Rate",
+    Placeholder = "0 = off",
+    Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
+})
+
+grpVal:AddInput("MinWeight", {
+    Default     = "0",
+    Numeric     = true,
+    Finished    = true,
+    Text        = "Min Weight",
+    Placeholder = "0 = off",
+    Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
+})
+
+grpVal:AddInput("MaxWeight", {
+    Default     = "0",
+    Numeric     = true,
+    Finished    = true,
+    Text        = "Max Weight",
+    Placeholder = "0 = off",
+    Callback = function(v)
+        local n = tonumber(v) or 0
+        State.maxModelWeight = n == 0 and 999999999 or n
+    end,
+})
+
+-- ── STORE ─────────────────────────────────────────────────────
+local grpSell = Tabs.Store:AddLeftGroupbox("Auto Sell")
+
+grpSell:AddToggle("SellEnable", {
+    Text    = "Enable Auto Sell",
+    Default = false,
+    Callback = function(v) State.sellEnabled = v; if v then loadModules() end end,
+})
+
+grpSell:AddToggle("SellAll", {
+    Text    = "Sell Every Pet",
+    Default = false,
+    Callback = function(v) State.sellAll = v end,
+})
+
+grpSell:AddSlider("SellInterval", {
+    Text    = "Interval (s)",
+    Default = 5, Min = 1, Max = 60, Rounding = 0,
+    Callback = function(v) State.sellInterval = v end,
+})
+
+grpSell:AddDropdown("SellMaxRarity", {
+    Values  = RARITIES,
+    Default = "Epic",
+    Text    = "Sell Max Rarity",
+    Callback = function(v) State.sellMaxRarity = v end,
+})
+
+grpSell:AddButton({
+    Text = "Sell Now",
+    Func = function() loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2) end,
+})
+
+-- ── CONFIG ─────────────────────────────────────────────────────
+local grpCfg = Tabs.Config:AddLeftGroupbox("Config")
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:SetFolder("SAE_Test")
+SaveManager:BuildConfigSection(Tabs.Config)
+ThemeManager:ApplyToGroupbox(grpCfg)
+
+Notify("Steal An Egg", "v2.0 loaded!", 3)
