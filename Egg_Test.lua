@@ -72,6 +72,9 @@ local State = {
     placeEnabled      = false,
     placeInterval     = 5,
     placeMinRarity    = "All",
+    -- Auto Place Pet
+    placePetEnabled   = false,
+    placePetInterval  = 5,
     -- Auto Hatch (independent loop)
     hatchEnabled      = false,
     hatchInterval     = 3,
@@ -410,7 +413,7 @@ local function updateAnim()
     end)
 end
 -- ============================================================
-local function walkTo(goal, timeout, isReturning)
+local function walkTo(goal, timeout, isReturning, checkFn)
     local h2 = hum()
     local r  = root()
     if not h2 or not r then return false end
@@ -431,7 +434,12 @@ local function walkTo(goal, timeout, isReturning)
     local lastPos  = r.Position
     local stuckT   = t0
 
-    while workspace.DistributedGameTime - t0 < timeout and State.running do
+    -- checkFn optional: kalau return false, batalkan walkTo
+    -- default: cek State.running (hanya untuk farm cycle)
+    local shouldContinue = checkFn or function() return State.running end
+
+    while workspace.DistributedGameTime - t0 < timeout do
+        if not shouldContinue() then break end
         task.wait(0.02)
         r  = root(); h2 = hum()
         if not r or not h2 then break end
@@ -443,14 +451,12 @@ local function walkTo(goal, timeout, isReturning)
             h2:Move(Vector3.zero, false)
             r.AssemblyLinearVelocity  = Vector3.zero
             r.AssemblyAngularVelocity = Vector3.zero
-            -- Hard snap ke base saat returning
             if isReturning then
                 pcall(function() r.CFrame = CFrame.new(START_POS) end)
             end
             break
         end
 
-        -- Brake
         local brake = math.clamp(speed * 0.3, 15, 80)
         if dist <= brake then
             h2.WalkSpeed = math.max(16, speed * (dist/brake)^2)
@@ -459,7 +465,6 @@ local function walkTo(goal, timeout, isReturning)
         end
         h2:MoveTo(goal)
 
-        -- Stuck detection
         local now = workspace.DistributedGameTime
         if now - stuckT >= 2 then
             if (r.Position - lastPos).Magnitude < 0.5 then
@@ -546,11 +551,11 @@ local function runAutoPlace()
             return
         end
 
-        -- Walk ke plot dulu
+        -- Walk ke plot dulu (independent dari State.running)
         local plotPos = myPlot.CenterPoint.Position
         local r = root()
         if r and (r.Position - plotPos).Magnitude > 5 then
-            walkTo(plotPos, 15, true)
+            walkTo(plotPos, 15, true, function() return State.placeEnabled end)
         end
         task.wait(0.3)
 
@@ -619,6 +624,68 @@ task.spawn(function()
         if State.placeEnabled then
             if not EggState then loadModules() end
             pcall(runAutoPlace)
+        end
+    end
+end)
+
+-- ============================================================
+-- AUTO PLACE PET — scan Backpack ItemType=Asset, pindah ke Character
+-- ============================================================
+local function runAutoPlacePet()
+    if not PlotState then loadModules() end
+    if not PlotState then return end
+    pcall(function()
+        local myPlot = PlotState.ResolvePlot()
+        if not myPlot or not myPlot.CenterPoint or not myPlot.PetArea then return end
+
+        -- Walk ke plot
+        local plotPos = myPlot.CenterPoint.Position
+        local r = root()
+        if r and (r.Position - plotPos).Magnitude > 5 then
+            walkTo(plotPos, 15, true, function() return State.placePetEnabled end)
+        end
+        task.wait(0.3)
+
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        local placeRemote = net and net:FindFirstChild("RF/EggWorld/AskPlaceEgg")
+        if not placeRemote then return end
+
+        local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
+
+        -- Scan backpack buat pet (ItemType = Asset atau Phone)
+        local placed = 0
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if not tool:IsA("Tool") then continue end
+            local itemType = tool:GetAttribute("ItemType")
+            if itemType ~= "Asset" and itemType ~= "Phone" then continue end
+
+            -- Equip pet
+            pcall(function() tool.Parent = LocalPlayer.Character end)
+            task.wait(0.15)
+
+            local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid") or tool.Name
+            local ok3, res = pcall(function()
+                return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
+            end)
+            if ok3 and res then
+                placed += 1
+                print("[AutoPlacePet] placed:", tool.Name)
+            else
+                pcall(function() tool.Parent = LocalPlayer.Backpack end)
+            end
+            task.wait(0.1)
+        end
+        print(string.format("[AutoPlacePet] total placed=%d", placed))
+    end)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(State.placePetInterval or 5)
+        if State.placePetEnabled then
+            if not PlotState then loadModules() end
+            pcall(runAutoPlacePet)
         end
     end
 end)
@@ -1049,6 +1116,7 @@ local Window = Library:CreateWindow({
     Footer   = "v2.0",
     AutoShow = true,
     Center   = true,
+    Size     = Vector2.new(500, 400),
 })
 
 local Tabs = {
@@ -1181,6 +1249,21 @@ grpPlace:AddDropdown("PlaceMinRarity", {
 
 grpPlace:AddButton({ Text = "Place Now", Func = function()
     loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2)
+end })
+
+local grpPlacePet = Tabs.Farm:AddLeftGroupbox("Auto Place Pet")
+
+grpPlacePet:AddToggle("PlacePet", {
+    Text    = "Enable",
+    Default = false,
+    Callback = function(v) State.placePetEnabled = v; if v then loadModules() end end,
+})
+grpPlacePet:AddSlider("PlacePetInterval", {
+    Text = "Interval (s)", Default = 5, Min = 1, Max = 30, Rounding = 0,
+    Callback = function(v) State.placePetInterval = v end,
+})
+grpPlacePet:AddButton({ Text = "Place Pet Now", Func = function()
+    loadModules(); pcall(runAutoPlacePet); Notify("Place Pet","Triggered!",2)
 end })
 
 local grpHatch = Tabs.Farm:AddRightGroupbox("Auto Hatch")
