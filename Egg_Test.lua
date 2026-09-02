@@ -657,10 +657,17 @@ local function runAutoPlace()
                 task.wait(0.25)
             end
 
-            -- 2. AskPlaceEgg
-            local ok3, res, reason = pcall(function()
-                return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
-            end)
+            -- 2. PlantEgg via EggState (set internal flag + AskPlaceEgg)
+            local ok3, res, reason
+            if EggState and EggState.PlantEgg then
+                ok3, res, reason = pcall(function()
+                    return EggState.PlantEgg(uid, localCFrame)
+                end)
+            else
+                ok3, res, reason = pcall(function()
+                    return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
+                end)
+            end
             print("[AutoPlace] result:", ok3, tostring(res), tostring(reason), "uid:", uid:sub(1,8))
             if ok3 and res == true then
                 placed += 1
