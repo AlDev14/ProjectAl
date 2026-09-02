@@ -577,7 +577,11 @@ local function runAutoPlace()
             print("[AutoPlace] EggState nil"); return
         end
 
-        pcall(function() EggState.SyncOwnedEggs() end)
+        -- Sync — lanjut meski gagal
+        local syncOk, syncErr = pcall(function() EggState.SyncOwnedEggs() end)
+        if not syncOk then
+            warn("[AutoPlace] SyncOwnedEggs error:", tostring(syncErr))
+        end
         task.wait(0.3)
 
         local ok, owned = pcall(function()
@@ -594,17 +598,27 @@ local function runAutoPlace()
 
         local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
+        local skippedPlacement = 0
+        local processed = 0
+        local MAX_PER_RUN = 5 -- batasi 5 dulu buat debug
 
         -- Handle dua format: dict {[uid]=rec} atau array {[1]={Uid=uid,...}}
         for k, rec in pairs(owned) do
             local uid
             if type(k) == "string" then
-                uid = k  -- dict format
+                uid = k
             elseif type(rec) == "table" and rec.Uid then
-                uid = rec.Uid  -- array format
+                uid = rec.Uid
             end
-            if not uid then continue end
-            if rec.Placement ~= nil then continue end  -- sudah di-place
+            if type(k) ~= "string" then continue end
+            -- Placement = sudah di-plot, skip
+            if rec.Placement ~= nil then
+                skippedPlacement += 1
+                continue
+            end
+
+            if processed >= MAX_PER_RUN then break end
+            processed += 1
 
             -- Filter rarity
             if minRarNum > 0 then
@@ -629,13 +643,15 @@ local function runAutoPlace()
             end)
             if ok3 and res then
                 placed += 1
-                print("[AutoPlace] placed uid:", uid, "asset:", tostring(rec.AssetCategory))
             else
-                warn("[AutoPlace] failed uid:", uid, tostring(res))
+                warn("[AutoPlace] failed uid:", uid:sub(1,8), "res:", tostring(res))
             end
             task.wait(0.1)
         end
-        print(string.format("[AutoPlace] total placed=%d", placed))
+        print(string.format("[AutoPlace] DONE placed=%d skipped=%d / total=%d",
+            placed, skippedPlacement, (function()
+                local c=0; for _ in pairs(owned) do c+=1 end; return c
+            end)()))
     end)
 end
 
