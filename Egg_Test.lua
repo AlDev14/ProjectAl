@@ -1986,8 +1986,8 @@ local RARITIES = {
 }
 
 local Window = Library:CreateWindow({
-    Title           = "Steal An Egg",
-    Footer          = "v2.0",
+    Title    = "WISNU HUB",
+    Footer   = "Steal An Egg v2.0",
     AutoShow        = true,
     Center          = true,
     MobileButtonsSide = "Right",
