@@ -1124,7 +1124,6 @@ local Window = Library:CreateWindow({
     Footer   = "v2.0",
     AutoShow = true,
     Center   = true,
-    Size     = Vector2.new(500, 400),
 })
 
 local Tabs = {
