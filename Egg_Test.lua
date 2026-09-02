@@ -75,6 +75,8 @@ local State = {
     -- Auto Place Pet
     placePetEnabled   = false,
     placePetInterval  = 5,
+    -- No Knockback
+    noKnockback       = false,
     -- Auto Hatch (independent loop)
     hatchEnabled      = false,
     hatchInterval     = 3,
@@ -301,6 +303,53 @@ local function isValueAllowed(record)
     if State.minModelWeight > 0 and w < State.minModelWeight then return false end
     if w > State.maxModelWeight then return false end
     return true
+end
+
+-- ============================================================
+-- NO KNOCKBACK — disconnect RE/RigSync/Refresh (Lutosys/opensrc)
+-- ============================================================
+local function applyNoKnockback()
+    if type(getconnections) ~= "function" then
+        warn("[NoKnockback] getconnections not available")
+        return
+    end
+    local net = ReplicatedStorage:FindFirstChild("Packages")
+        and ReplicatedStorage.Packages:FindFirstChild("Networking")
+    if not net then warn("[NoKnockback] Networking not found"); return end
+    local remote = net:FindFirstChild("RE/RigSync/Refresh")
+    if not remote then warn("[NoKnockback] RE/RigSync/Refresh not found"); return end
+    local ok, conns = pcall(function() return getconnections(remote.OnClientEvent) end)
+    if not ok or not conns then warn("[NoKnockback] getconnections failed"); return end
+    local patched = 0
+    for _, conn in next, conns do
+        pcall(function() conn:Disconnect() end)
+        patched += 1
+    end
+    print("[NoKnockback] patched", patched, "connections")
+end
+
+-- ============================================================
+-- AUTO UPGRADE BASE — RE/Homestead/AskBaseTierRaise (Lutosys/opensrc)
+-- ============================================================
+local function upgradeBase()
+    local net = ReplicatedStorage:FindFirstChild("Packages")
+        and ReplicatedStorage.Packages:FindFirstChild("Networking")
+    if not net then warn("[UpgradeBase] Networking not found"); return end
+    local remote = net:FindFirstChild("RE/Homestead/AskBaseTierRaise")
+    if not remote then warn("[UpgradeBase] remote not found"); return end
+    pcall(function() remote:FireServer() end)
+    print("[UpgradeBase] fired")
+end
+
+-- Auto upgrade treadmill
+local function upgradeTreadmill(id)
+    local net = ReplicatedStorage:FindFirstChild("Packages")
+        and ReplicatedStorage.Packages:FindFirstChild("Networking")
+    if not net then return end
+    local remote = net:FindFirstChild("RF/Treadmill/AskTierRaise")
+    if not remote then return end
+    pcall(function() remote:InvokeServer(id) end)
+    print("[UpgradeTreadmill] fired id:", tostring(id))
 end
 
 -- ============================================================
@@ -1236,6 +1285,16 @@ grpSteal:AddToggle("BatAura", {
     Callback = function(v) State.batAura = v end,
 })
 
+grpSteal:AddToggle("NoKnockback", {
+    Text    = "No Knockback",
+    Default = false,
+    Tooltip = "Disconnect RigSync/Refresh — getconnections required",
+    Callback = function(v)
+        State.noKnockback = v
+        if v then applyNoKnockback() end
+    end,
+})
+
 grpSteal:AddSlider("WalkSpeed", {
     Text     = "Walk Speed",
     Default  = 120,
@@ -1294,6 +1353,14 @@ grpVisual:AddToggle("AnimToggle", {
     Tooltip = "Off = R6 tegak diam",
     Callback = function(v) State.animEnabled = v; updateAnim() end,
 })
+
+grpVisual:AddButton({ Text = "Upgrade Base", Func = function()
+    upgradeBase()
+end })
+
+grpVisual:AddButton({ Text = "Upgrade Treadmill", Func = function()
+    upgradeTreadmill(1)
+end })
 
 -- ── FARM LEFT — Place & Hatch ─────────────────────────────────
 local grpPlace = Tabs.Farm:AddLeftGroupbox("Auto Place Egg")
