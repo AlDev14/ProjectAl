@@ -1601,8 +1601,7 @@ local Library     = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
-local Options = Library.Options
-local Toggles = Library.Toggles
+if not Library then warn("[SAE] Obsidian gagal load"); return end
 
 local function Notify(title, text, dur)
     pcall(function()
