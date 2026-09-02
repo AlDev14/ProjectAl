@@ -172,10 +172,8 @@ end
 -- RARITY FILTER
 -- ============================================================
 local function isRarityAllowed(record)
-    -- Empty = semua allowed
     local t = State.targetRarities
     if not t then return true end
-    -- Cek apakah ada entry
     local hasAny = false
     if type(t) == "table" then
         for _ in pairs(t) do hasAny = true; break end
@@ -183,15 +181,23 @@ local function isRarityAllowed(record)
     if not hasAny then return true end
 
     local name = getRarityName(record)
-    if not name then return true end
+    if not name or name == "Unknown" then return true end -- unknown = skip filter
+
+    -- Debug: print sekali per uid baru
+    -- print("[RarityFilter] egg=" .. tostring(record.AssetCategory) .. " rarity=" .. name)
 
     -- VVind multi-dropdown return {[name]=true}
     if t[name] == true then return true end
-    -- Fallback array format
-    if type(t) == "table" then
-        for _, v in ipairs(t) do
-            if v == name then return true end
+    -- Case-insensitive fallback
+    local nameLower = name:lower()
+    for k, v in pairs(t) do
+        if v == true and type(k) == "string" and k:lower() == nameLower then
+            return true
         end
+    end
+    -- Array fallback
+    for _, v in ipairs(t) do
+        if type(v) == "string" and v:lower() == nameLower then return true end
     end
     return false
 end
