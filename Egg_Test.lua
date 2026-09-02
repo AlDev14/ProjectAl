@@ -1984,9 +1984,10 @@ grpPlace:AddToggle("PlaceEgg", {
     Callback = function(v) State.placeEnabled = v; if v then loadModules() end end,
 })
 
-grpPlace:AddSlider("PlaceInterval", {
-    Text = "Interval (s)", Default = 5, Min = 1, Max = 30, Rounding = 0,
-    Callback = function(v) State.placeInterval = v end,
+grpPlace:AddSlider("PlaceThreshold_UI", {
+    Text = "Trigger Count", Default = 50, Min = 1, Max = 200, Rounding = 0,
+    Tooltip = "Auto place kalau egg di backpack >= ini",
+    Callback = function(v) State.placeThreshold = v end,
 })
 
 grpPlace:AddDropdown("PlaceMinRarity", {
@@ -2155,7 +2156,7 @@ local grpFav = Tabs.Store:AddRightGroupbox("Auto Favorite")
 grpFav:AddToggle("FavEnable", {
     Text    = "Auto Favorite",
     Default = false,
-    Tooltip = "Favorite pet >= min rarity biar gak ke-sell",
+    Tooltip = "Event-based: langsung favorite saat pet baru masuk backpack",
     Callback = function(v) State.favoriteEnabled = v end,
 })
 grpFav:AddSlider("FavInterval", {
