@@ -596,13 +596,16 @@ local function runAutoPlace()
         local placed = 0
 
         for uid, rec in pairs(owned) do
-            -- Filter rarity
+            -- Filter rarity — kalau gak bisa dibaca, loloskan
             if minRarNum > 0 then
                 local rarNum = 0
                 if rec.Rarity and type(rec.Rarity) == "table" then
                     rarNum = rec.Rarity.RarityNumber or 0
+                elseif rec.RarityNumber and type(rec.RarityNumber) == "number" then
+                    rarNum = rec.RarityNumber
                 end
-                if rarNum < minRarNum then continue end
+                -- rarNum == 0 = unknown rarity, loloskan
+                if rarNum > 0 and rarNum < minRarNum then continue end
             end
 
             -- 1. WearEggTool — equip via remote
