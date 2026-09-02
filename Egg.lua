@@ -488,14 +488,31 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- AUTO SELL — independent loop
+-- AUTO SELL — equip egg via AskWearTool + walkTo sell stand
 -- ============================================================
+local _sellStandPos = nil
+local function getSellStandPos()
+    if _sellStandPos then return _sellStandPos end
+    -- Scan workspace cari ProximityPrompt SellHeldAsset
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Name == "SellHeldAsset" then
+            local part = obj.Parent
+            if part and part:IsA("BasePart") then
+                _sellStandPos = part.Position
+                return _sellStandPos
+            end
+        end
+    end
+    return nil
+end
+
 local function runAutoSell()
     pcall(function()
         local net = ReplicatedStorage:FindFirstChild("Packages")
             and ReplicatedStorage.Packages:FindFirstChild("Networking")
         if not net then return end
 
+        -- Sell All pets (bukan egg)
         if State.sellAll then
             local remote = net:FindFirstChild("RE/PetSatchel/SellEveryPet")
             if remote then pcall(function() remote:FireServer() end) end
@@ -505,19 +522,30 @@ local function runAutoSell()
         if not EggState then loadModules() end
         if not EggState then return end
 
-        local remote = net:FindFirstChild("RE/PetSatchel/SellPet")
-        if not remote then return end
+        local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
+        if not wearRemote then return end
+
+        local sellPos = getSellStandPos()
+        if not sellPos then return end
 
         local maxNum = getRarityNumberByName(State.sellMaxRarity)
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
-        if not ok or type(owned) ~= "table" then return end
+        if not ok or type(owned) ~= "table" or #owned == 0 then return end
 
         for _, rec in ipairs(owned) do
             if not rec.Uid then continue end
-            if getRarityNumber(rec) <= maxNum then
-                pcall(function() remote:FireServer(rec.Uid) end)
-                task.wait(0.05)
-            end
+            if getRarityNumber(rec) > maxNum then continue end
+
+            -- 1. Equip egg jadi tool
+            local ok2, res = pcall(function()
+                return wearRemote:InvokeServer(rec.Uid)
+            end)
+            if not ok2 then continue end
+            task.wait(0.2)
+
+            -- 2. Walk ke sell stand (SellHeldAsset prompt auto-trigger saat dalam 10 stud)
+            walkTo(sellPos, 10, false)
+            task.wait(0.3)
         end
     end)
 end
