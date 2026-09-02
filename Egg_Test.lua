@@ -865,23 +865,23 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- ORVION UI
+-- VVIND UI
 -- ============================================================
-local Orvion
+local VindUI
 do
     local ok, r = pcall(function()
         return loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/KnullXDgt/Orvion-UI-Library/main/source.luau"
+            "https://raw.githubusercontent.com/Skinny-yz/VVind-UI/refs/heads/main/src.lua"
         ))()
     end)
-    if ok and r then Orvion = r
-    else warn("[SAE] Orvion gagal: " .. tostring(r)); return end
+    if ok and r then VindUI = r
+    else warn("[SAE] VVind gagal: " .. tostring(r)); return end
 end
 
-local VindLib = Orvion  -- alias untuk Notify
-
-local function Notify(title, text, dur)
-    pcall(function() Orvion:Notify(title, text, dur or 3) end)
+local function Notify(title, text, ntype, dur)
+    pcall(function()
+        VindUI:Notify({ Title = title, Text = text, Type = ntype or "info", Duration = dur or 3 })
+    end)
 end
 
 local RARITIES = {
@@ -891,275 +891,267 @@ local RARITIES = {
     "Eternal","Brainrot","Mythical","Exclusive"
 }
 
-local Window = Orvion:CreateWindow({
+local Window = VindUI:CreateWindow({
     Title     = "Steal An Egg",
-    Theme     = "Default",
-    Size      = UDim2.fromOffset(470, 270),
-    Center    = true,
+    Subtitle  = "v2.0 — Test",
+    Icon      = "Lucide:egg",
+    Size      = UDim2.fromOffset(520, 400),
+    MinSize   = Vector2.new(420, 340),
     Draggable = true,
-    Badges    = {"v2.0"},
+    Resizable = true,
+    UseBlur   = false,
 })
 
--- TABS
-local tabFarm,   _ = Window:CreateTab("Farm",   nil)
-local tabStore,  _ = Window:CreateTab("Store",  nil)
-local tabConfig, _ = Window:CreateTab("Config", nil)
+local tabFarm   = Window:AddTab({ Name = "Farm",   Icon = "Lucide:wheat" })
+local tabStore  = Window:AddTab({ Name = "Store",  Icon = "Lucide:shopping-bag" })
+local tabConfig = Window:AddTab({ Name = "Config", Icon = "Lucide:settings" })
 
 -- ── FARM ─────────────────────────────────────────────────────
-local secMain = Window:AddCollapsible(tabFarm, "Auto Steal", true)
+local secMain = tabFarm:AddSubTab({ Name = "Auto Steal", Icon = "Lucide:zap" })
 
-Window:AddToggle(secMain, "Auto Steal", "Start / stop auto farm", false, function(v)
-    State.running = v
-    if v then
-        loadModules()
-        doHumanoidBypass()
-        Notify("SAE", "Farm started!", 2)
-        task.spawn(function()
-            while State.running do
-                farmCycle()
-                task.wait(0.05)
-            end
-        end)
-    else
-        State.running      = false
-        State.busy         = false
-        State.lockedRecord = nil
-        if _camConn then _camConn:Disconnect(); _camConn = nil end
-        Notify("SAE", "Farm stopped.", 2)
-        task.delay(0.3, function()
-            pcall(function()
-                local h2 = hum(); if h2 then h2.Health = 0 end
+secMain:AddToggle({
+    Text     = "Auto Steal",
+    Default  = false,
+    Flag     = "Toggle_AutoSteal",
+    Callback = function(v)
+        State.running = v
+        if v then
+            loadModules()
+            doHumanoidBypass()
+            Notify("SAE", "Farm started!", "success", 2)
+            task.spawn(function()
+                while State.running do
+                    farmCycle()
+                    task.wait(0.05)
+                end
             end)
-        end)
-    end
-end, "Toggle_AutoSteal")
+        else
+            State.running      = false
+            State.busy         = false
+            State.lockedRecord = nil
+            if _camConn then _camConn:Disconnect(); _camConn = nil end
+            if _speedConn then _speedConn:Disconnect(); _speedConn = nil end
+            Notify("SAE", "Farm stopped.", "info", 2)
+            task.delay(0.3, function()
+                pcall(function()
+                    local h2 = hum(); if h2 then h2.Health = 0 end
+                end)
+            end)
+        end
+    end,
+})
 
-Window:AddToggle(secMain, "Anti-Guard", "Speed 1000 when returning", true, function(v)
-    State.antiGuard = v
-end, "Toggle_AntiGuard")
+secMain:AddToggle({
+    Text     = "Anti-Guard",
+    Default  = true,
+    Flag     = "Toggle_AntiGuard",
+    Callback = function(v) State.antiGuard = v end,
+})
 
-Window:AddToggle(secMain, "Bat Aura", "Spam bat swing (aura kill)", false, function(v)
-    State.batAura = v
-end, "Toggle_BatAura")
+secMain:AddToggle({
+    Text     = "Bat Aura",
+    Default  = false,
+    Flag     = "Toggle_BatAura",
+    Callback = function(v) State.batAura = v end,
+})
 
-Window:AddInput(secMain, "Walk Speed", "Speed to egg (default 120)", "120", function(v)
-    State.speed = tonumber(v) or 120
-end, "Input_WalkSpeed")
+secMain:AddSlider({
+    Text      = "Walk Speed",
+    Min       = 16,
+    Max       = 500,
+    Default   = 120,
+    Increment = 1,
+    Flag      = "Slider_WalkSpeed",
+    Callback  = function(v) State.speed = v end,
+})
 
 -- ── AUTO PLACE ────────────────────────────────────────────────
-local secPlace = Window:AddCollapsible(tabFarm, "Auto Place", false)
+local secPlace = tabFarm:AddSubTab({ Name = "Auto Place", Icon = "Lucide:map-pin" })
 
-Window:AddToggle(secPlace, "Enable Auto Place", "Plant eggs to plot every X seconds", false, function(v)
-    State.placeEnabled = v
-    if v then loadModules() end
-end, "Toggle_Place")
+secPlace:AddToggle({
+    Text     = "Enable Auto Place",
+    Default  = false,
+    Flag     = "Toggle_Place",
+    Callback = function(v)
+        State.placeEnabled = v
+        if v then loadModules() end
+    end,
+})
 
-Window:AddInput(secPlace, "Interval (s)", "How often to place (seconds)", "5", function(v)
-    State.placeInterval = tonumber(v) or 5
-end, "Input_PlaceInterval")
+secPlace:AddSlider({
+    Text      = "Interval (s)",
+    Min       = 1,
+    Max       = 30,
+    Default   = 5,
+    Increment = 1,
+    Flag      = "Slider_PlaceInterval",
+    Callback  = function(v) State.placeInterval = v end,
+})
 
-Window:AddDropdown(secPlace,
-    "Min Rarity to Place",
-    "Only place eggs at or above this rarity",
-    RARITIES, false, "All",
-    function(v) State.placeMinRarity = type(v) == "table" and v[1] or v end,
-    "Dropdown_PlaceRarity"
-)
+secPlace:AddDropdown({
+    Text     = "Min Rarity to Place",
+    Options  = RARITIES,
+    Default  = "Common",
+    Flag     = "Dropdown_PlaceRarity",
+    Callback = function(v) State.placeMinRarity = v end,
+})
 
-Window:AddButton(secPlace, "Place Now", "Trigger place immediately", nil, function()
-    loadModules(); pcall(runAutoPlace)
-    Notify("Place", "Triggered!", 2)
-end)
+secPlace:AddButton({
+    Text     = "Place Now",
+    Callback = function()
+        loadModules(); pcall(runAutoPlace)
+        Notify("Place", "Triggered!", "success", 2)
+    end,
+})
 
 -- ── AUTO HATCH ────────────────────────────────────────────────
-local secHatch = Window:AddCollapsible(tabFarm, "Auto Hatch", false)
+local secHatch = tabFarm:AddSubTab({ Name = "Auto Hatch", Icon = "Lucide:layers" })
 
-Window:AddToggle(secHatch, "Enable Auto Hatch", "Hatch eggs every X seconds", false, function(v)
-    State.hatchEnabled = v
-    if v then loadModules() end
-end, "Toggle_Hatch")
+secHatch:AddToggle({
+    Text     = "Enable Auto Hatch",
+    Default  = false,
+    Flag     = "Toggle_Hatch",
+    Callback = function(v)
+        State.hatchEnabled = v
+        if v then loadModules() end
+    end,
+})
 
-Window:AddInput(secHatch, "Interval (s)", "How often to hatch (seconds)", "3", function(v)
-    State.hatchInterval = tonumber(v) or 3
-end, "Input_HatchInterval")
+secHatch:AddSlider({
+    Text      = "Interval (s)",
+    Min       = 1,
+    Max       = 30,
+    Default   = 3,
+    Increment = 1,
+    Flag      = "Slider_HatchInterval",
+    Callback  = function(v) State.hatchInterval = v end,
+})
 
-Window:AddButton(secHatch, "Hatch Now", "Trigger hatch immediately", nil, function()
-    loadModules(); pcall(runAutoHatch)
-    Notify("Hatch", "Triggered!", 2)
-end)
+secHatch:AddButton({
+    Text     = "Hatch Now",
+    Callback = function()
+        loadModules(); pcall(runAutoHatch)
+        Notify("Hatch", "Triggered!", "success", 2)
+    end,
+})
 
 -- ── ESP ───────────────────────────────────────────────────────
-local secESP = Window:AddCollapsible(tabFarm, "ESP", false)
+local secESP = tabFarm:AddSubTab({ Name = "ESP", Icon = "Lucide:eye" })
 
-Window:AddToggle(secESP, "Egg ESP", "Show rarity/value label on eggs", false, function(v)
-    State.espEnabled = v
-    if not v then
-        for uid in pairs(EspHighlights) do clearESP(uid) end
-    end
-end, "Toggle_EggESP")
+secESP:AddToggle({
+    Text     = "Egg ESP",
+    Default  = false,
+    Flag     = "Toggle_EggESP",
+    Callback = function(v)
+        State.espEnabled = v
+        if not v then
+            for uid in pairs(EspHighlights) do clearESP(uid) end
+        end
+    end,
+})
 
 -- ── FARM RARITY FILTER ────────────────────────────────────────
-local secRarity = Window:AddCollapsible(tabFarm, "Farm Rarity Filter", false)
+local secRarity = tabFarm:AddSubTab({ Name = "Rarity Filter", Icon = "Lucide:filter" })
 
-Window:AddDropdown(secRarity,
-    "Target Rarities",
-    "Select rarities to steal (empty = all)",
-    RARITIES, true, {},
-    function(v) State.targetRarities = v end,
-    "Dropdown_FarmRarities"
-)
+secRarity:AddDropdown({
+    Text     = "Target Rarities",
+    Options  = RARITIES,
+    Default  = {},
+    Multi    = true,
+    Flag     = "Dropdown_FarmRarities",
+    Callback = function(v) State.targetRarities = v end,
+})
 
 -- ── FARM VALUE FILTER ─────────────────────────────────────────
-local secVal = Window:AddCollapsible(tabFarm, "Farm Value Filter", false)
+local secVal = tabFarm:AddSubTab({ Name = "Value Filter", Icon = "Lucide:sliders" })
 
-Window:AddInput(secVal, "Min Earning Rate", "Skip eggs below this /hr (0 = off)", "0", function(v)
-    State.minEarningRate = tonumber(v) or 0
-end, "Input_MinEarning")
+secVal:AddInput({
+    Text     = "Min Earning Rate",
+    Default  = "0",
+    Flag     = "Input_MinEarning",
+    Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
+})
 
-Window:AddInput(secVal, "Min Weight", "Skip lighter (0 = off)", "0", function(v)
-    State.minModelWeight = tonumber(v) or 0
-end, "Input_MinWeight")
+secVal:AddInput({
+    Text     = "Min Weight",
+    Default  = "0",
+    Flag     = "Input_MinWeight",
+    Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
+})
 
-Window:AddInput(secVal, "Max Weight", "Skip heavier (0 = off)", "0", function(v)
-    local n = tonumber(v) or 0
-    State.maxModelWeight = n == 0 and 999999999 or n
-end, "Input_MaxWeight")
+secVal:AddInput({
+    Text     = "Max Weight",
+    Default  = "0",
+    Flag     = "Input_MaxWeight",
+    Callback = function(v)
+        local n = tonumber(v) or 0
+        State.maxModelWeight = n == 0 and 999999999 or n
+    end,
+})
 
 -- ── STORE — AUTO SELL ─────────────────────────────────────────
-local secSell = Window:AddCollapsible(tabStore, "Auto Sell", true)
+local secSell = tabStore:AddSubTab({ Name = "Auto Sell", Icon = "Lucide:tag" })
 
-Window:AddToggle(secSell, "Enable Auto Sell", "Sell eggs every X seconds", false, function(v)
-    State.sellEnabled = v
-    if v then loadModules() end
-end, "Toggle_Sell")
+secSell:AddToggle({
+    Text     = "Enable Auto Sell",
+    Default  = false,
+    Flag     = "Toggle_Sell",
+    Callback = function(v)
+        State.sellEnabled = v
+        if v then loadModules() end
+    end,
+})
 
-Window:AddInput(secSell, "Interval (s)", "How often to sell (seconds)", "5", function(v)
-    State.sellInterval = tonumber(v) or 5
-end, "Input_SellInterval")
+secSell:AddSlider({
+    Text      = "Interval (s)",
+    Min       = 1,
+    Max       = 60,
+    Default   = 5,
+    Increment = 1,
+    Flag      = "Slider_SellInterval",
+    Callback  = function(v) State.sellInterval = v end,
+})
 
-Window:AddToggle(secSell, "Sell Every Pet", "Sell ALL pets instantly", false, function(v)
-    State.sellAll = v
-end, "Toggle_SellAll")
+secSell:AddToggle({
+    Text     = "Sell Every Pet",
+    Default  = false,
+    Flag     = "Toggle_SellAll",
+    Callback = function(v) State.sellAll = v end,
+})
 
-Window:AddDropdown(secSell,
-    "Sell Max Rarity",
-    "Sell pets up to this rarity",
-    RARITIES, false, "Epic",
-    function(v) State.sellMaxRarity = type(v) == "table" and v[1] or v end,
-    "Dropdown_SellMax"
-)
+secSell:AddDropdown({
+    Text     = "Sell Max Rarity",
+    Options  = RARITIES,
+    Default  = "Epic",
+    Flag     = "Dropdown_SellMax",
+    Callback = function(v) State.sellMaxRarity = v end,
+})
 
-Window:AddButton(secSell, "Sell Now", "Trigger sell immediately", nil, function()
-    loadModules(); pcall(runAutoSell)
-    Notify("Sell", "Triggered!", 2)
-end)
+secSell:AddButton({
+    Text     = "Sell Now",
+    Callback = function()
+        loadModules(); pcall(runAutoSell)
+        Notify("Sell", "Triggered!", "success", 2)
+    end,
+})
 
 -- ── CONFIG ─────────────────────────────────────────────────────
-local secCfg = Window:AddCollapsible(tabConfig, "Configuration", true)
+local secCfg = tabConfig:AddSubTab({ Name = "Configuration", Icon = "Lucide:save" })
 
-Window:AddButton(secCfg, "Save Config", "Save current settings", nil, function()
-    pcall(function() Orvion:SaveConfig("SAE_config") end)
-    Notify("Config", "Saved!", 2)
-end)
+secCfg:AddButton({
+    Text     = "Save Config",
+    Callback = function()
+        pcall(function() VindUI:SaveConfig("SAE_test_config") end)
+        Notify("Config", "Saved!", "success", 2)
+    end,
+})
 
-Window:AddButton(secCfg, "Load Config", "Load saved settings", nil, function()
-    pcall(function() Orvion:LoadConfig("SAE_config") end)
-    Notify("Config", "Loaded!", 2)
-end)
+secCfg:AddButton({
+    Text     = "Load Config",
+    Callback = function()
+        pcall(function() VindUI:LoadConfig("SAE_test_config") end)
+        Notify("Config", "Loaded!", "success", 2)
+    end,
+})
 
--- ── SHOW ──────────────────────────────────────────────────
--- Snapshot CoreGui sebelum Show() — cari yang baru setelah Show()
-local _beforeShow = {}
-for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-    _beforeShow[sg] = true
-end
-
-Window:Show()
-Notify("Steal An Egg", "v2.0 loaded!", 3)
-
--- Cari ScreenGui baru yang ditambahkan oleh Orvion saat Show()
-local _orvionSG = nil
-for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-    if not _beforeShow[sg] and sg:IsA("ScreenGui") then
-        _orvionSG = sg
-        break
-    end
-end
-
--- ============================================================
--- FLOATING TOGGLE BUTTON — SETELAH Window:Show()
--- ============================================================
-task.spawn(function()
-    task.wait(0.3)
-
-    local UIS = UserInputService
-
-    -- Buat button di PlayerGui
-    local pg  = LocalPlayer:WaitForChild("PlayerGui")
-    local sg2 = Instance.new("ScreenGui")
-    sg2.Name           = "SAE_FloatBtn"
-    sg2.ResetOnSpawn   = false
-    sg2.IgnoreGuiInset = true
-    sg2.DisplayOrder   = 9999
-    sg2.Parent         = pg
-
-    local btn = Instance.new("ImageButton")
-    btn.Size                   = UDim2.new(0, 44, 0, 44)
-    btn.Position               = UDim2.new(0, 12, 0.5, -22)
-    btn.BackgroundColor3       = Color3.fromRGB(25, 25, 30)
-    btn.BackgroundTransparency = 0.3
-    btn.Image                  = "rbxassetid://121365062523142"
-    btn.ZIndex                 = 10
-    btn.Parent                 = sg2
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    local st = Instance.new("UIStroke", btn)
-    st.Color        = Color3.fromRGB(180, 180, 200)
-    st.Thickness    = 1.2
-    st.Transparency = 0.5
-
-    -- Drag
-    local dragging  = false
-    local dragStart = nil
-    local btnStart  = nil
-    local dragDist  = 0
-
-    btn.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1
-        or inp.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
-            dragDist  = 0
-            dragStart = inp.Position
-            btnStart  = btn.Position
-        end
-    end)
-
-    btn.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1
-        or inp.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    UIS.InputChanged:Connect(function(inp)
-        if not dragging then return end
-        if inp.UserInputType == Enum.UserInputType.MouseMovement
-        or inp.UserInputType == Enum.UserInputType.Touch then
-            local delta = inp.Position - dragStart
-            dragDist = delta.Magnitude
-            btn.Position = UDim2.new(
-                btnStart.X.Scale, btnStart.X.Offset + delta.X,
-                btnStart.Y.Scale, btnStart.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    -- Toggle — pakai _orvionSG yang dicapture setelah Show()
-    local uiOpen = true
-    btn.MouseButton1Click:Connect(function()
-        if dragDist > 6 then dragDist = 0; return end
-        uiOpen = not uiOpen
-        if _orvionSG then
-            _orvionSG.Enabled = uiOpen
-        end
-    end)
-end)
+Notify("Steal An Egg", "v2.0 Test loaded!", "success", 3)
