@@ -1213,6 +1213,30 @@ task.spawn(function()
     end
 end)
 
+-- Event-based favorite: langsung favorite saat pet baru masuk backpack
+LocalPlayer.Backpack.ChildAdded:Connect(function(tool)
+    if not State.favoriteEnabled then return end
+    task.wait(0.3) -- tunggu attributes ke-sync
+    pcall(function()
+        if not tool:IsA("Tool") then return end
+        local itype = tool:GetAttribute("ItemType")
+        if itype ~= "Asset" and itype ~= "Phone" then return end
+        local rarity = PET_RARITY_MAP[tool.Name]
+        local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
+        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
+        if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then return end
+        local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
+        if not uid then return end
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        local remote = net and net:FindFirstChild("RE/PetSatchel/WriteFavourite")
+        if remote then
+            pcall(function() remote:FireServer(uid, true) end)
+            print("[AutoFavorite] auto-fav new pet:", tool.Name)
+        end
+    end)
+end)
+
 -- ============================================================
 -- AUTO SELL — AskWearTool + getnilinstances + ToolTrigger
 -- Confirmed dari rspy SAE KONTOL.txt
@@ -1507,11 +1531,17 @@ end
 local function farmCycle()
     if State.busy or not State.running then return end
     State.busy = true
+    local _busyStart = tick()
 
     pcall(function()
         if not loadModules() then task.wait(0.5); return end
         local r = root(); local h2 = hum()
         if not r or not h2 then return end
+
+        -- Busy timeout safety: reset kalau > 30 detik
+        if tick() - _busyStart > 30 then
+            State.busy = false; return
+        end
 
         -- 1. Cari telur
         local rec, model = findBestEgg()
@@ -1523,11 +1553,20 @@ local function farmCycle()
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
         if not part then State.lockedRecord = nil; return end
 
-        -- 2. Jalan ke telur
+        -- 2. Jalan ke telur (gak snap, jalan biasa)
         if not walkTo(part.Position, 15, false) then return end
         if not State.running then return end
 
-        -- 3. Claim
+        -- 3. Claim — cek jarak dulu, kalau kena guardian skip
+        r = root()
+        if not r then return end
+        local dist = (r.Position - part.Position).Magnitude
+        if dist > 8 then
+            -- Terlalu jauh (kena hit), skip egg ini
+            State.lockedRecord = nil
+            return
+        end
+
         local slotKey = nil
         pcall(function()
             if AreaEggSlotIdentity and rec.AreaId and rec.NestId then
@@ -1535,7 +1574,7 @@ local function farmCycle()
             end
         end)
 
-        for _ = 1, 2 do
+        for _ = 1, 3 do -- retry 3x
             pcall(function() EggState.CarryFieldEgg(rec.Uid, slotKey) end)
             local prompt = model:FindFirstChild("CarryAreaEgg", true)
                 or model:FindFirstChildWhichIsA("ProximityPrompt", true)
@@ -1547,16 +1586,15 @@ local function farmCycle()
                     end
                 end)
             end
-            task.wait(0.01)
+            task.wait(0.05)
         end
         State.lockedRecord = nil
 
-        -- 4. Kembali ke base
-        walkTo(START_POS, 10, true)
+        -- 4. Kembali ke base (walkTo normal, tanpa snap)
+        walkTo(START_POS, 10, false)
         if not State.running then return end
 
         State.stealCount += 1
-        Notify("SAE", "Steal #" .. State.stealCount, 1.5)
     end)
 
     local h2 = hum()
