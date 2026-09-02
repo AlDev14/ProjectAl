@@ -629,17 +629,31 @@ local function runAutoPlace()
         local wearRemote  = net and net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not placeRemote then warn("[AutoPlace] AskPlaceEgg not found"); return end
 
-        -- LocalCFrame confirmed dari rspy: rotation 0,0,1,0,1,0,-1,0,0
-        local petPos = myPlot.PetArea.Position
+        -- Scan semua slot di PetArea — random offset biar egg tersebar
+        local petArea = myPlot.PetArea
         local centerCF = myPlot.CenterPoint.CFrame
-        local localPos = centerCF:PointToObjectSpace(petPos)
-        local localCFrame = CFrame.new(localPos) * CFrame.fromMatrix(
-            Vector3.zero,
-            Vector3.new(0,0,-1),  -- RightVector
-            Vector3.new(0,1,0),   -- UpVector
-            Vector3.new(1,0,0)    -- BackVector
-        )
-        print("[AutoPlace] localCFrame:", localCFrame)
+        local petSize = petArea.Size
+        -- Base localPos dari PetArea
+        local basePetPos = myPlot.PetArea.Position
+
+        -- Fungsi buat generate localCFrame dengan random offset di dalam PetArea bounds
+        local slotIndex = 0
+        local function nextLocalCFrame()
+            slotIndex += 1
+            -- Grid offset: spread egg di seluruh area
+            local halfX = (petSize.X * 0.4)
+            local halfZ = (petSize.Z * 0.4)
+            local offsetX = (math.random() * 2 - 1) * halfX
+            local offsetZ = (math.random() * 2 - 1) * halfZ
+            local worldPos = basePetPos + Vector3.new(offsetX, 0, offsetZ)
+            local localPos = centerCF:PointToObjectSpace(worldPos)
+            return CFrame.new(localPos) * CFrame.fromMatrix(
+                Vector3.zero,
+                Vector3.new(0,0,-1),
+                Vector3.new(0,1,0),
+                Vector3.new(1,0,0)
+            )
+        end
 
         -- Sync dulu dari server biar ReadOwnerEggs up-to-date
         if not EggState then
@@ -722,7 +736,8 @@ local function runAutoPlace()
                 task.wait(0.25)
             end
 
-            -- 2. AskPlaceEgg langsung
+            -- 2. AskPlaceEgg dengan random slot offset
+            local localCFrame = nextLocalCFrame()
             local ok3, res = pcall(function()
                 return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
             end)
