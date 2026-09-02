@@ -1967,11 +1967,11 @@ grpVisual:AddToggle("AnimToggle", {
     Callback = function(v) State.animEnabled = v; updateAnim() end,
 })
 
-grpVisual:AddButton({ Text = "Upgrade Base", Func = function()
+grpVisual:AddButton({ Text = "Upgrade Base", Callback = function()
     upgradeBase()
 end })
 
-grpVisual:AddButton({ Text = "Upgrade Treadmill", Func = function()
+grpVisual:AddButton({ Text = "Upgrade Treadmill", Callback = function()
     upgradeTreadmill(1)
 end })
 
@@ -2013,7 +2013,7 @@ grpPlace:AddDropdown("PlaceMinRarity", {
     end,
 })
 
-grpPlace:AddButton({ Text = "Place Now", Func = function()
+grpPlace:AddButton({ Text = "Place Now", Callback = function()
     loadModules(); pcall(runAutoPlace); Notify("Place","Triggered!",2)
 end })
 
@@ -2029,7 +2029,7 @@ grpPlacePet:AddSlider("PlacePetThreshold", {
     Tooltip = "Auto place kalau pet di backpack >= ini",
     Callback = function(v) State.placePetThreshold = v end,
 })
-grpPlacePet:AddButton({ Text = "Place Pet Now", Func = function()
+grpPlacePet:AddButton({ Text = "Place Pet Now", Callback = function()
     loadModules(); pcall(runAutoPlacePet); Notify("Place Pet","Triggered!",2)
 end })
 
@@ -2042,7 +2042,7 @@ grpPlaceBest:AddSlider("PlaceBestPetInterval", {
     Text = "Interval (s)", Default = 10, Min = 5, Max = 60, Rounding = 0,
     Callback = function(v) State.placeBestPetInterval = v end,
 })
-grpPlaceBest:AddButton({ Text = "Place Best Now", Func = function()
+grpPlaceBest:AddButton({ Text = "Place Best Now", Callback = function()
     loadModules(); pcall(runAutoPlaceBestPet); Notify("Place Best","Triggered!",2)
 end })
 
@@ -2059,7 +2059,7 @@ grpHatch:AddSlider("HatchInterval", {
     Callback = function(v) State.hatchInterval = v end,
 })
 
-grpHatch:AddButton({ Text = "Hatch Now", Func = function()
+grpHatch:AddButton({ Text = "Hatch Now", Callback = function()
     loadModules(); pcall(runAutoHatch); Notify("Hatch","Triggered!",2)
 end })
 
@@ -2118,7 +2118,7 @@ grpSell:AddDropdown("SellMaxRarity", {
         end
     end,
 })
-grpSell:AddButton({ Text = "Sell Now", Func = function()
+grpSell:AddButton({ Text = "Sell Now", Callback = function()
     loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
 end })
 
@@ -2131,7 +2131,7 @@ grpSellEgg:AddSlider("SellEggInterval", {
     Text = "Interval (s)", Default = 10, Min = 5, Max = 60, Rounding = 0,
     Callback = function(v) State.sellEggInterval = v end,
 })
-grpSellEgg:AddButton({ Text = "Sell Egg Now", Func = function()
+grpSellEgg:AddButton({ Text = "Sell Egg Now", Callback = function()
     loadModules(); pcall(runAutoSellEgg); Notify("Sell Egg","Triggered!",2)
 end })
 
@@ -2147,7 +2147,7 @@ grpCollect:AddSlider("CollectInterval", {
     Text = "Interval (s)", Default = 60, Min = 10, Max = 300, Rounding = 0,
     Callback = function(v) State.collectInterval = v end,
 })
-grpCollect:AddButton({ Text = "Collect Now", Func = function()
+grpCollect:AddButton({ Text = "Collect Now", Callback = function()
     pcall(runCollectMoney); Notify("Collect","Claimed!",2)
 end })
 
@@ -2182,7 +2182,7 @@ grpFav:AddDropdown("FavMinRarity", {
         end
     end,
 })
-grpFav:AddButton({ Text = "Favorite Now", Func = function()
+grpFav:AddButton({ Text = "Favorite Now", Callback = function()
     pcall(runAutoFavorite); Notify("Favorite","Done!",2)
 end })
 
@@ -2236,14 +2236,14 @@ grpMisc2:AddToggle("AntiStaff", {
     end,
 })
 
-grpMisc2:AddButton({ Text = "Rejoin", Func = function()
+grpMisc2:AddButton({ Text = "Rejoin", Callback = function()
     local TeleportService = game:GetService("TeleportService")
     pcall(function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end)
 end })
 
-grpMisc2:AddButton({ Text = "Server Hop", Func = function()
+grpMisc2:AddButton({ Text = "Server Hop", Callback = function()
     pcall(function()
         local HS = game:GetService("HttpService")
         local TPS = game:GetService("TeleportService")
