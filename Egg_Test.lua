@@ -142,11 +142,20 @@ local function getEggsFromBackpack(minRarity)
     local minNum = RARITY_ORDER[minRarity] or 0
     for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
+            -- Filter: hanya egg (ItemType = AssetEgg atau PetEgg)
+            local itemType = tool:GetAttribute("ItemType")
+            if itemType ~= "AssetEgg" and itemType ~= "PetEgg" then continue end
+
             local rarity = EGG_RARITY_MAP[tool.Name]
-            if rarity then -- ini egg
+            if rarity then
                 local rarNum = RARITY_ORDER[rarity] or 0
                 if minNum <= 0 or rarNum >= minNum then
                     table.insert(result, {tool = tool, name = tool.Name, rarity = rarity, rarNum = rarNum})
+                end
+            else
+                -- Egg tapi gak ada di map — tetap include (unknown rarity)
+                if minNum <= 0 then
+                    table.insert(result, {tool = tool, name = tool.Name, rarity = "Unknown", rarNum = 0})
                 end
             end
         end
