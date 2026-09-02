@@ -636,8 +636,23 @@ local function runAutoPlace()
                 if rarNum > 0 and rarNum < minRarNum then continue end
             end
 
-            -- 1. WearEggTool — equip via remote
-            if wearRemote then
+            -- 1. Equip egg — sama kayak auto place pet (pindah tool ke Character)
+            -- Cari tool di backpack yang match uid atau ItemType=AssetEgg
+            local eggTool = nil
+            for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                if t:IsA("Tool") then
+                    local itype = t:GetAttribute("ItemType")
+                    if itype == "AssetEgg" or itype == "PetEgg" then
+                        eggTool = t
+                        break
+                    end
+                end
+            end
+            if eggTool then
+                pcall(function() eggTool.Parent = LocalPlayer.Character end)
+                task.wait(0.2)
+            elseif wearRemote then
+                -- Fallback remote
                 pcall(function() wearRemote:InvokeServer(uid) end)
                 task.wait(0.25)
             end
