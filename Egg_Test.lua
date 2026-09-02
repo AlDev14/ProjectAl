@@ -83,6 +83,10 @@ local State = {
     -- Collect Money
     collectEnabled    = false,
     collectInterval   = 60,
+    -- Auto Favorite
+    favoriteEnabled   = false,
+    favoriteInterval  = 30,
+    favoriteMinRarity = "Legendary",
     -- Auto Hatch (independent loop)
     hatchEnabled      = false,
     hatchInterval     = 3,
@@ -913,6 +917,64 @@ task.spawn(function()
     end
 end)
 
+task.spawn(function()
+    while true do
+        task.wait(State.favoriteInterval or 30)
+        if State.favoriteEnabled then
+            pcall(runAutoFavorite)
+        end
+    end
+end)
+
+-- ============================================================
+-- AUTO FAVORITE PET — RE/PetSatchel/WriteFavourite
+-- ============================================================
+local function runAutoFavorite()
+    if not EggState then loadModules() end
+    if not EggState then return end
+    pcall(function()
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local remote = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
+        if not remote then warn("[AutoFavorite] WriteFavourite not found"); return end
+
+        local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
+        local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
+        if type(owned) ~= "table" then return end
+
+        local favCount = 0
+        for uid, rec in pairs(owned) do
+            if type(uid) ~= "string" then continue end
+            -- Sudah hatched = punya pet (ada di satchel), bukan egg lagi
+            -- Filter by rarity
+            if minRarNum > 0 then
+                local rarNum = 0
+                if rec.Rarity and type(rec.Rarity) == "table" then
+                    rarNum = rec.Rarity.RarityNumber or 0
+                end
+                if rarNum > 0 and rarNum < minRarNum then continue end
+            end
+            pcall(function() remote:FireServer(uid, true) end)
+            favCount += 1
+            task.wait(0.05)
+        end
+
+        -- Favorite pet di satchel (asset satchel scan backpack)
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if not tool:IsA("Tool") then continue end
+            local itype = tool:GetAttribute("ItemType")
+            if itype ~= "Asset" and itype ~= "Phone" then continue end
+            local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
+            if not uid then continue end
+            pcall(function() remote:FireServer(uid, true) end)
+            favCount += 1
+            task.wait(0.05)
+        end
+
+        if favCount > 0 then print("[AutoFavorite] favorited:", favCount) end
+    end)
+end
 -- ============================================================
 -- AUTO SELL — AskWearTool + getnilinstances + ToolTrigger
 -- Confirmed dari rspy SAE KONTOL.txt
@@ -1548,6 +1610,26 @@ grpCollect:AddSlider("CollectInterval", {
 })
 grpCollect:AddButton({ Text = "Collect Now", Func = function()
     pcall(runCollectMoney); Notify("Collect","Claimed!",2)
+end })
+
+local grpFav = Tabs.Store:AddRightGroupbox("Auto Favorite")
+
+grpFav:AddToggle("FavEnable", {
+    Text    = "Auto Favorite",
+    Default = false,
+    Tooltip = "Favorite pet >= min rarity biar gak ke-sell",
+    Callback = function(v) State.favoriteEnabled = v end,
+})
+grpFav:AddSlider("FavInterval", {
+    Text = "Interval (s)", Default = 30, Min = 10, Max = 300, Rounding = 0,
+    Callback = function(v) State.favoriteInterval = v end,
+})
+grpFav:AddDropdown("FavMinRarity", {
+    Values = RARITIES, Default = "Legendary", Text = "Min Rarity",
+    Callback = function(v) State.favoriteMinRarity = v end,
+})
+grpFav:AddButton({ Text = "Favorite Now", Func = function()
+    pcall(runAutoFavorite); Notify("Favorite","Done!",2)
 end })
 
 -- ── CONFIG ─────────────────────────────────────────────────────
