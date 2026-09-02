@@ -115,45 +115,72 @@ end
 -- ASSET HELPERS
 -- ============================================================
 local function getAssetData(record)
-    if not Assets or not record or not record.AssetCategory then return {} end
-    local ok, d = pcall(function()
-        return (Assets.Directory or Assets)[record.AssetCategory] or {}
-    end)
-    return ok and d or {}
+    if not record then return {} end
+    -- Coba Assets.Directory dulu
+    if Assets and record.AssetCategory then
+        local ok, d = pcall(function()
+            return (Assets.Directory or Assets)[record.AssetCategory] or {}
+        end)
+        if ok and d and next(d) then return d end
+    end
+    -- Fallback: bangun dari field record langsung (record punya Rarity, EarningRate, dll)
+    return {
+        EarningRate = record.EarningRate,
+        ModelWeight = record.ModelWeight,
+        DropWeight  = record.DropWeight,
+        DisplayName = record.AssetCategory,
+        Rarity      = record.Rarity,
+        _id         = record.AssetCategory,
+    }
 end
 
 local function getEarningRate(record)
+    if record and record.EarningRate then return tonumber(record.EarningRate) or 0 end
     return tonumber(getAssetData(record).EarningRate) or 0
 end
 
 local function getModelWeight(record)
+    if record and record.ModelWeight then return tonumber(record.ModelWeight) or 0 end
     return tonumber(getAssetData(record).ModelWeight) or 0
 end
 
 local function getRarityName(record)
+    -- Cek record.Rarity langsung (paling reliable, gak butuh Assets)
+    if record and record.Rarity then
+        if type(record.Rarity) == "table" and record.Rarity._id then
+            return record.Rarity._id
+        end
+        if type(record.Rarity) == "string" then return record.Rarity end
+    end
     local d = getAssetData(record)
     return (d.Rarity and d.Rarity._id) or "Unknown"
 end
 
 local function getRarityColor(record)
-    local d = getAssetData(record)
-    if d.Rarity and typeof(d.Rarity.Color) == "Color3" then
-        return d.Rarity.Color
+    if record and record.Rarity and type(record.Rarity) == "table" then
+        if typeof(record.Rarity.Color) == "Color3" then return record.Rarity.Color end
     end
+    local d = getAssetData(record)
+    if d.Rarity and typeof(d.Rarity.Color) == "Color3" then return d.Rarity.Color end
     if RarityModule and RarityModule.Rarities then
-        local rn = d.Rarity and d.Rarity._id
-        local rm = rn and RarityModule.Rarities[rn]
+        local rn = getRarityName(record)
+        local rm = RarityModule.Rarities[rn]
         if rm and typeof(rm.Color) == "Color3" then return rm.Color end
     end
     return Color3.fromRGB(255, 255, 255)
 end
 
 local function getRarityNumber(record)
+    if record and record.Rarity and type(record.Rarity) == "table" then
+        if type(record.Rarity.RarityNumber) == "number" then
+            return record.Rarity.RarityNumber
+        end
+    end
     local d = getAssetData(record)
     if d.Rarity and d.Rarity.RarityNumber then return d.Rarity.RarityNumber end
     if RarityModule and RarityModule.Rarities then
-        local rn = d.Rarity and d.Rarity._id
-        local rm = rn and RarityModule.Rarities[rn]
+        local rn = getRarityName(record)
+        local rm = RarityModule.Rarities[rn]
         if rm then return rm.RarityNumber or 0 end
     end
     return 0
