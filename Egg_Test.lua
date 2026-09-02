@@ -1033,6 +1033,7 @@ local function runAutoSellEgg()
             and ReplicatedStorage.Packages:FindFirstChild("Networking")
         if not net then return end
         local sellRemote = net:FindFirstChild("RE/PetSatchel/SellPet")
+        local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not sellRemote then warn("[SellEgg] SellPet not found"); return end
 
         local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
@@ -1048,9 +1049,14 @@ local function runAutoSellEgg()
                 rarNum = rec.Rarity.RarityNumber or 0
             end
             if rarNum > 0 and rarNum > maxNum then continue end
+            -- Equip dulu via AskWearTool
+            if wearRemote then
+                pcall(function() wearRemote:InvokeServer(uid) end)
+                task.wait(0.2)
+            end
             pcall(function() sellRemote:FireServer({uid}) end)
             sold += 1
-            task.wait(0.05)
+            task.wait(0.1)
         end
         if sold > 0 then print("[SellEgg] sold:", sold) end
     end)
@@ -1176,6 +1182,7 @@ local function runAutoFavorite()
             and ReplicatedStorage.Packages:FindFirstChild("Networking")
         if not net then return end
         local remote = net:FindFirstChild("RE/PetSatchel/WriteFavourite")
+        local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not remote then warn("[AutoFavorite] WriteFavourite not found"); return end
 
         local minRarNum = RARITY_ORDER[State.favoriteMinRarity] or 0
@@ -1187,13 +1194,18 @@ local function runAutoFavorite()
             local itype = tool:GetAttribute("ItemType")
             if itype ~= "Asset" and itype ~= "Phone" then continue end
 
-            -- Filter by rarity
             local rarity = PET_RARITY_MAP[tool.Name]
             local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
             if minRarNum > 0 and rarNum > 0 and rarNum < minRarNum then continue end
 
             local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
             if not uid then continue end
+
+            -- Equip dulu via WearEggTool
+            if wearRemote then
+                pcall(function() wearRemote:InvokeServer(uid) end)
+                task.wait(0.15)
+            end
 
             pcall(function() remote:FireServer(uid, true) end)
             favCount += 1
