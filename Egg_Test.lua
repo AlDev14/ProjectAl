@@ -572,17 +572,25 @@ local function runAutoPlace()
 
         local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
 
-        -- Ambil semua owned eggs via ReadOwnerEggs — uid langsung tersedia
+        -- Sync dulu dari server biar ReadOwnerEggs up-to-date
         if not EggState then
             print("[AutoPlace] EggState nil"); return
         end
+
+        pcall(function() EggState.SyncOwnedEggs() end)
+        task.wait(0.3)
 
         local ok, owned = pcall(function()
             return EggState.ReadOwnerEggs(LocalPlayer.UserId)
         end)
         if not ok or type(owned) ~= "table" or not next(owned) then
-            print("[AutoPlace] owned egg kosong"); return
+            print("[AutoPlace] owned egg kosong — ok:", ok, "type:", type(owned))
+            return
         end
+
+        print("[AutoPlace] owned eggs count:", (function()
+            local c = 0; for _ in pairs(owned) do c += 1 end; return c
+        end)())
 
         local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
