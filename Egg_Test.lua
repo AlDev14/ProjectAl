@@ -873,23 +873,24 @@ task.spawn(function()
     end
 end)
 
+
 -- ============================================================
--- VVIND UI
+-- VEXUI
 -- ============================================================
-local VindUI
+local VexUI
 do
     local ok, r = pcall(function()
         return loadstring(game:HttpGet(
-            "https://cdn.jsdelivr.net/gh/Skinny-yz/VVind-UI@main/src.lua"
+            "https://github.com/SSHRKs/VexUI/releases/latest/download/main.lua"
         ))()
     end)
-    if ok and r then VindUI = r
-    else warn("[SAE] VVind gagal: " .. tostring(r)); return end
+    if ok and r then VexUI = r
+    else warn("[SAE] VexUI gagal: " .. tostring(r)); return end
 end
 
-local function Notify(title, text, ntype, dur)
+local function Notify(title, text, dur)
     pcall(function()
-        VindUI:Notify({ Title = title, Text = text, Type = ntype or "info", Duration = dur or 3 })
+        VexUI:Notification({ Title = title, Desc = text, Duration = dur or 3 })
     end)
 end
 
@@ -900,34 +901,33 @@ local RARITIES = {
     "Eternal","Brainrot","Mythical","Exclusive"
 }
 
-local Window = VindUI:CreateWindow({
-    Title     = "Steal An Egg",
-    Subtitle  = "v2.0 — Test",
-    Icon      = "Lucide:egg",
-    Size      = UDim2.fromOffset(520, 400),
-    MinSize   = Vector2.new(420, 340),
-    Draggable = true,
-    Resizable = true,
-    UseBlur   = false,
+local Window = VexUI:CreateWindow({
+    Name        = "Steal An Egg",
+    Icon        = "egg",
+    Theme       = "Dark",
+    Transparent = true,
+    Author      = "v2.0 Test",
+    User        = { Enabled = false },
 })
 
-local tabFarm   = Window:AddTab({ Name = "Farm",   Icon = "Lucide:wheat" })
-local tabStore  = Window:AddTab({ Name = "Store",  Icon = "Lucide:shopping-bag" })
-local tabConfig = Window:AddTab({ Name = "Config", Icon = "Lucide:settings" })
+local tabFarm   = Window:Tab({ Title = "Farm",   Icon = "wheat" })
+local tabStore  = Window:Tab({ Title = "Store",  Icon = "shopping-bag" })
+local tabConfig = Window:Tab({ Title = "Config", Icon = "settings" })
+Window:SelectTab(1)
 
 -- ── FARM ─────────────────────────────────────────────────────
-local secMain = tabFarm:AddSubTab({ Name = "Auto Steal", Icon = "Lucide:zap" })
+tabFarm:Section({ Title = "Auto Steal" })
 
-secMain:AddToggle({
-    Text     = "Auto Steal",
+local grpSteal = tabFarm:Group({})
+grpSteal:Toggle({
+    Title    = "Auto Steal",
     Default  = false,
-    Flag     = "Toggle_AutoSteal",
     Callback = function(v)
         State.running = v
         if v then
             loadModules()
             doHumanoidBypass()
-            Notify("SAE", "Farm started!", "success", 2)
+            Notify("SAE", "Farm started!", 2)
             task.spawn(function()
                 while State.running do
                     farmCycle()
@@ -938,149 +938,126 @@ secMain:AddToggle({
             State.running      = false
             State.busy         = false
             State.lockedRecord = nil
-            if _camConn then _camConn:Disconnect(); _camConn = nil end
+            if _camConn   then _camConn:Disconnect();   _camConn   = nil end
             if _speedConn then _speedConn:Disconnect(); _speedConn = nil end
-            Notify("SAE", "Farm stopped.", "info", 2)
-            task.delay(0.3, function()
-                pcall(function()
-                    -- Health=0 dihapus, biarkan karakter jalan normal
-                end)
-            end)
+            Notify("SAE", "Farm stopped.", 2)
         end
     end,
 })
-
-secMain:AddToggle({
-    Text     = "Anti-Guard",
+grpSteal:Toggle({
+    Title    = "Anti-Guard",
     Default  = true,
-    Flag     = "Toggle_AntiGuard",
     Callback = function(v) State.antiGuard = v end,
 })
 
-secMain:AddToggle({
-    Text     = "Bat Aura",
+local grpMisc = tabFarm:Group({})
+grpMisc:Toggle({
+    Title    = "Bat Aura",
     Default  = false,
-    Flag     = "Toggle_BatAura",
     Callback = function(v) State.batAura = v end,
 })
-
-secMain:AddToggle({
-    Text     = "Float (3 stud)",
-    Default  = false,
-    Flag     = "Toggle_Float",
-    Callback = function(v)
-        State.floatEnabled = v
-        updateFloat()
-    end,
-})
-
-secMain:AddSlider({
-    Text      = "Float Height",
-    Min       = 1,
-    Max       = 10,
-    Default   = 3,
-    Increment = 1,
-    Flag      = "Slider_FloatHeight",
-    Callback  = function(v) State.floatHeight = v end,
-})
-
-secMain:AddToggle({
-    Text     = "Animation",
+grpMisc:Toggle({
+    Title    = "Animation",
     Default  = true,
-    Flag     = "Toggle_Anim",
     Callback = function(v)
         State.animEnabled = v
         updateAnim()
     end,
 })
 
-secMain:AddSlider({
-    Text      = "Walk Speed",
-    Min       = 16,
-    Max       = 500,
-    Default   = 120,
-    Increment = 1,
-    Flag      = "Slider_WalkSpeed",
-    Callback  = function(v) State.speed = v end,
+local grpFloat = tabFarm:Group({})
+grpFloat:Toggle({
+    Title    = "Float (visual)",
+    Default  = false,
+    Callback = function(v)
+        State.floatEnabled = v
+        updateFloat()
+    end,
+})
+grpFloat:Slider({
+    Title = "Float Height",
+    Value = { Min = 1, Max = 10, Default = 3 },
+    Step  = 1,
+    Callback = function(v) State.floatHeight = v end,
+})
+
+tabFarm:Slider({
+    Title = "Walk Speed",
+    Desc  = "Speed to egg target",
+    Value = { Min = 16, Max = 500, Default = 120 },
+    Step  = 1,
+    Callback = function(v) State.speed = v end,
 })
 
 -- ── AUTO PLACE ────────────────────────────────────────────────
-local secPlace = tabFarm:AddSubTab({ Name = "Auto Place", Icon = "Lucide:map-pin" })
+tabFarm:Section({ Title = "Auto Place" })
 
-secPlace:AddToggle({
-    Text     = "Enable Auto Place",
+local grpPlace = tabFarm:Group({})
+grpPlace:Toggle({
+    Title    = "Enable",
     Default  = false,
-    Flag     = "Toggle_Place",
     Callback = function(v)
         State.placeEnabled = v
         if v then loadModules() end
     end,
 })
-
-secPlace:AddSlider({
-    Text      = "Interval (s)",
-    Min       = 1,
-    Max       = 30,
-    Default   = 5,
-    Increment = 1,
-    Flag      = "Slider_PlaceInterval",
-    Callback  = function(v) State.placeInterval = v end,
+grpPlace:Slider({
+    Title = "Interval (s)",
+    Value = { Min = 1, Max = 30, Default = 5 },
+    Step  = 1,
+    Callback = function(v) State.placeInterval = v end,
 })
 
-secPlace:AddDropdown({
-    Text     = "Min Rarity to Place",
-    Options  = RARITIES,
-    Default  = "Common",
-    Flag     = "Dropdown_PlaceRarity",
+tabFarm:Dropdown({
+    Title    = "Min Rarity to Place",
+    Multi    = false,
+    Option   = RARITIES,
+    Value    = "Common",
     Callback = function(v) State.placeMinRarity = v end,
 })
 
-secPlace:AddButton({
-    Text     = "Place Now",
+tabFarm:Button({
+    Title    = "Place Now",
     Callback = function()
         loadModules(); pcall(runAutoPlace)
-        Notify("Place", "Triggered!", "success", 2)
+        Notify("Place", "Triggered!", 2)
     end,
 })
 
 -- ── AUTO HATCH ────────────────────────────────────────────────
-local secHatch = tabFarm:AddSubTab({ Name = "Auto Hatch", Icon = "Lucide:layers" })
+tabFarm:Section({ Title = "Auto Hatch" })
 
-secHatch:AddToggle({
-    Text     = "Enable Auto Hatch",
+local grpHatch = tabFarm:Group({})
+grpHatch:Toggle({
+    Title    = "Enable",
     Default  = false,
-    Flag     = "Toggle_Hatch",
     Callback = function(v)
         State.hatchEnabled = v
         if v then loadModules() end
     end,
 })
-
-secHatch:AddSlider({
-    Text      = "Interval (s)",
-    Min       = 1,
-    Max       = 30,
-    Default   = 3,
-    Increment = 1,
-    Flag      = "Slider_HatchInterval",
-    Callback  = function(v) State.hatchInterval = v end,
+grpHatch:Slider({
+    Title = "Interval (s)",
+    Value = { Min = 1, Max = 30, Default = 3 },
+    Step  = 1,
+    Callback = function(v) State.hatchInterval = v end,
 })
 
-secHatch:AddButton({
-    Text     = "Hatch Now",
+tabFarm:Button({
+    Title    = "Hatch Now",
     Callback = function()
         loadModules(); pcall(runAutoHatch)
-        Notify("Hatch", "Triggered!", "success", 2)
+        Notify("Hatch", "Triggered!", 2)
     end,
 })
 
 -- ── ESP ───────────────────────────────────────────────────────
-local secESP = tabFarm:AddSubTab({ Name = "ESP", Icon = "Lucide:eye" })
+tabFarm:Section({ Title = "ESP" })
 
-secESP:AddToggle({
-    Text     = "Egg ESP",
+tabFarm:Toggle({
+    Title    = "Egg ESP",
+    Desc     = "Show rarity/value label on eggs",
     Default  = false,
-    Flag     = "Toggle_EggESP",
     Callback = function(v)
         State.espEnabled = v
         if not v then
@@ -1089,39 +1066,42 @@ secESP:AddToggle({
     end,
 })
 
--- ── FARM RARITY FILTER ────────────────────────────────────────
-local secRarity = tabFarm:AddSubTab({ Name = "Rarity Filter", Icon = "Lucide:filter" })
+-- ── RARITY FILTER ─────────────────────────────────────────────
+tabFarm:Section({ Title = "Rarity Filter" })
 
-secRarity:AddDropdown({
-    Text     = "Target Rarities",
-    Options  = RARITIES,
-    Default  = {},
+tabFarm:Dropdown({
+    Title    = "Target Rarities",
+    Desc     = "Empty = steal all",
     Multi    = true,
-    Flag     = "Dropdown_FarmRarities",
-    Callback = function(v) State.targetRarities = v end,
+    Option   = RARITIES,
+    Value    = {},
+    Callback = function(v)
+        -- VexUI multi dropdown return array
+        State.targetRarities = {}
+        for _, name in ipairs(v) do
+            State.targetRarities[name] = true
+        end
+    end,
 })
 
--- ── FARM VALUE FILTER ─────────────────────────────────────────
-local secVal = tabFarm:AddSubTab({ Name = "Value Filter", Icon = "Lucide:sliders" })
+-- ── VALUE FILTER ──────────────────────────────────────────────
+tabFarm:Section({ Title = "Value Filter" })
 
-secVal:AddInput({
-    Text     = "Min Earning Rate",
-    Default  = "0",
-    Flag     = "Input_MinEarning",
+tabFarm:Input({
+    Title    = "Min Earning Rate",
+    Desc     = "Skip eggs below this /hr (0 = off)",
     Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
 })
 
-secVal:AddInput({
-    Text     = "Min Weight",
-    Default  = "0",
-    Flag     = "Input_MinWeight",
+tabFarm:Input({
+    Title    = "Min Weight",
+    Desc     = "Skip lighter (0 = off)",
     Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
 })
 
-secVal:AddInput({
-    Text     = "Max Weight",
-    Default  = "0",
-    Flag     = "Input_MaxWeight",
+tabFarm:Input({
+    Title    = "Max Weight",
+    Desc     = "Skip heavier (0 = off)",
     Callback = function(v)
         local n = tonumber(v) or 0
         State.maxModelWeight = n == 0 and 999999999 or n
@@ -1129,68 +1109,70 @@ secVal:AddInput({
 })
 
 -- ── STORE — AUTO SELL ─────────────────────────────────────────
-local secSell = tabStore:AddSubTab({ Name = "Auto Sell", Icon = "Lucide:tag" })
+tabStore:Section({ Title = "Auto Sell" })
 
-secSell:AddToggle({
-    Text     = "Enable Auto Sell",
+local grpSell = tabStore:Group({})
+grpSell:Toggle({
+    Title    = "Enable",
     Default  = false,
-    Flag     = "Toggle_Sell",
     Callback = function(v)
         State.sellEnabled = v
         if v then loadModules() end
     end,
 })
-
-secSell:AddSlider({
-    Text      = "Interval (s)",
-    Min       = 1,
-    Max       = 60,
-    Default   = 5,
-    Increment = 1,
-    Flag      = "Slider_SellInterval",
-    Callback  = function(v) State.sellInterval = v end,
-})
-
-secSell:AddToggle({
-    Text     = "Sell Every Pet",
+grpSell:Toggle({
+    Title    = "Sell Every Pet",
     Default  = false,
-    Flag     = "Toggle_SellAll",
     Callback = function(v) State.sellAll = v end,
 })
 
-secSell:AddDropdown({
-    Text     = "Sell Max Rarity",
-    Options  = RARITIES,
-    Default  = "Epic",
-    Flag     = "Dropdown_SellMax",
+tabStore:Slider({
+    Title = "Interval (s)",
+    Value = { Min = 1, Max = 60, Default = 5 },
+    Step  = 1,
+    Callback = function(v) State.sellInterval = v end,
+})
+
+tabStore:Dropdown({
+    Title    = "Sell Max Rarity",
+    Multi    = false,
+    Option   = RARITIES,
+    Value    = "Epic",
     Callback = function(v) State.sellMaxRarity = v end,
 })
 
-secSell:AddButton({
-    Text     = "Sell Now",
+tabStore:Button({
+    Title    = "Sell Now",
     Callback = function()
         loadModules(); pcall(runAutoSell)
-        Notify("Sell", "Triggered!", "success", 2)
+        Notify("Sell", "Triggered!", 2)
     end,
 })
 
 -- ── CONFIG ─────────────────────────────────────────────────────
-local secCfg = tabConfig:AddSubTab({ Name = "Configuration", Icon = "Lucide:save" })
+tabConfig:Section({ Title = "Configuration" })
 
-secCfg:AddButton({
-    Text     = "Save Config",
+tabConfig:Dropdown({
+    Title    = "Theme",
+    Option   = {"Dark","Light","Forest","Amethyst"},
+    Value    = "Dark",
+    Callback = function(v) Window:SetTheme(v) end,
+})
+
+local grpCfg = tabConfig:Group({})
+grpCfg:Button({
+    Title    = "Save Config",
     Callback = function()
-        pcall(function() VindUI:SaveConfig("SAE_test_config") end)
-        Notify("Config", "Saved!", "success", 2)
+        pcall(function() VexUI:SaveConfig("SAE_test") end)
+        Notify("Config", "Saved!", 2)
+    end,
+})
+grpCfg:Button({
+    Title    = "Load Config",
+    Callback = function()
+        pcall(function() VexUI:LoadConfig("SAE_test") end)
+        Notify("Config", "Loaded!", 2)
     end,
 })
 
-secCfg:AddButton({
-    Text     = "Load Config",
-    Callback = function()
-        pcall(function() VindUI:LoadConfig("SAE_test_config") end)
-        Notify("Config", "Loaded!", "success", 2)
-    end,
-})
-
-Notify("Steal An Egg", "v2.0 Test loaded!", "success", 3)
+Notify("Steal An Egg", "v2.0 loaded!", 3)
