@@ -1665,6 +1665,10 @@ addToggle(tFarm, "Auto Steal", false, function(v)
         if _camConn   then _camConn:Disconnect();   _camConn   = nil end
         if _speedConn then _speedConn:Disconnect(); _speedConn = nil end
         Notify("SAE", "Farm stopped.", 2)
+        -- Restore humanoid asli via LoadCharacter
+        task.delay(0.3, function()
+            pcall(function() LocalPlayer:LoadCharacter() end)
+        end)
     end
 end)
 addToggle(tFarm, "Anti-Guard", true,  function(v) State.antiGuard = v end)
