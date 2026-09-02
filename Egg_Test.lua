@@ -641,7 +641,7 @@ local function runAutoSell()
             if not rec.Uid then continue end
             local rarNum = getRarityNumber(rec)
             if rarNum <= maxNum then
-                pcall(function() remote:FireServer(rec.Uid) end)
+                pcall(function() remote:FireServer({rec.Uid}) end)
                 sold += 1
                 task.wait(0.05)
             else
