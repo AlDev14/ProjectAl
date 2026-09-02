@@ -107,57 +107,43 @@ end
 -- EGG NAME LOOKUP BY RARITY (Source: IGN wiki + in-game confirmed)
 -- Tool di Backpack = nama pet saja (tanpa " Egg")
 -- ============================================================
-local EGG_BY_RARITY = {
-    ["Common"]    = {"Chicken","Dog","Frog","Duckling","Jerboa"},
-    ["Uncommon"]  = {"Bird","Catfish","Fennec"},
-    ["Rare"]      = {"Owl","Raccoon","Turtle","Camel","Toucan","Chimpanzee","Penguin","Lava Gecko","Parrotfish","Dodo","Tung Tung Sahur"},
-    ["Epic"]      = {"Bear","Fox","Trulimero Trulicina","Swan","Tob Tobi Tob Tob","Crocodile","Walrus","Lava Frog","Swordfish","Centapede","Crane","Bananita Dolphinita"},
-    ["Legendary"] = {"Brr Brr Patapim","Axolotl","Snake","Gorilla","Orangutini Ananassini","Polar Bear","Flaming Bull","Lava Iguana","Shark","Pterodactyl","Cosmic Gecko","Salamander","Crustacia","Spideron","Scorpio","Mecha Scorpio"},
-    ["Mythic"]    = {"Scorpion","Sand Spider","Spider","Tiger","Sabertooth Tiger","Mammoth","Chillin Chilli","Orca","Ankylosaurus","Cosmic Gorilla","Red Panda","Bladehide","Belula Beluga","Froggo","Mecha Froggo"},
-    ["Divine"]    = {"Unicorn","Kitsune","Dreadscale","Mecha Dreadscale"},
-    ["Secret"]    = {"King Snake","Yeti","Cerberus","Kraken","Tralaledon","TRex","Cosmic Dragon","Cosmic Skeleton Boss","Stag","Mutant Shark","Bomboclat Crocolat","Crocodon","Mecha Crocodon"},
-    ["Cosmic"]    = {"Leviathan","Royal Sphinx","King Mammoth","Whale Shark","Beluga Whale","Triceratops","Bronto","Mosasaurus","Koi","Snowy Owl","Mantaris","Rhinotaur","Mangolini Parrochini","Crawler","Mecha Crawler"},
-    ["Eternal"]   = {"Ice Dragon","Phoenix","Lava Dragon","El Maja","Eternal Lunar Dragon","Oni Tiger","Gorilla King","Strawberry Elephant","Krakenoid","Mecha Krakenoid"},
+-- ============================================================
+-- EGG AREA NAMES (biome names di backpack)
+-- ============================================================
+local AREA_NAMES = {
+    "Forest","Lake","Desert","Jungle","Snow","Volcano",
+    "Abyss Ocean","Prehistoric","Cosmic","Cherry Blossom","Titan Temple"
 }
+local AREA_SET = {}
+for _, a in ipairs(AREA_NAMES) do AREA_SET[a] = true end
 
--- Flat reverse: eggName → rarity
-local EGG_RARITY_MAP = {}
-for rarity, eggs in pairs(EGG_BY_RARITY) do
-    for _, name in ipairs(eggs) do
-        EGG_RARITY_MAP[name] = rarity
-    end
-end
-
--- Rarity order buat compare
-local RARITY_ORDER = {
-    Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,
-    SuperRare=7,Exotic=8,Limited=9,Divine=10,Secret=11,Titan=12,
-    Cosmic=13,Celestial=14,Transcendent=15,Prismatic=16,Rainbow=17,
-    Eternal=18,Brainrot=19,Mythical=20,Exclusive=21,
-}
-
--- Helper: ambil semua egg dari Backpack, filter by min rarity
+-- Helper: ambil semua egg dari Backpack
+-- Identifikasi via ItemType = AssetEgg/PetEgg, atau nama area
 local function getEggsFromBackpack(minRarity)
     local result = {}
     local minNum = RARITY_ORDER[minRarity] or 0
     for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            -- Filter: hanya egg (ItemType = AssetEgg atau PetEgg)
-            local itemType = tool:GetAttribute("ItemType")
-            if itemType ~= "AssetEgg" and itemType ~= "PetEgg" then continue end
-
-            local rarity = EGG_RARITY_MAP[tool.Name]
-            if rarity then
-                local rarNum = RARITY_ORDER[rarity] or 0
-                if minNum <= 0 or rarNum >= minNum then
-                    table.insert(result, {tool = tool, name = tool.Name, rarity = rarity, rarNum = rarNum})
-                end
-            else
-                -- Egg tapi gak ada di map — tetap include (unknown rarity)
-                if minNum <= 0 then
-                    table.insert(result, {tool = tool, name = tool.Name, rarity = "Unknown", rarNum = 0})
-                end
-            end
+        if not tool:IsA("Tool") then continue end
+        local itemType = tool:GetAttribute("ItemType")
+        -- Egg kalau ItemType = AssetEgg/PetEgg ATAU nama tool ada di AREA_SET
+        local isEgg = (itemType == "AssetEgg" or itemType == "PetEgg") or AREA_SET[tool.Name]
+        if not isEgg then continue end
+        -- Rarity dari attribute atau 0 (unknown)
+        local rarNum = 0
+        local rarity = "Unknown"
+        -- Coba baca rarity dari attribute
+        local rarAttr = tool:GetAttribute("Rarity") or tool:GetAttribute("rarity")
+        if rarAttr and RARITY_ORDER[rarAttr] then
+            rarity = rarAttr
+            rarNum = RARITY_ORDER[rarAttr]
+        end
+        if minNum <= 0 or rarNum >= minNum or rarNum == 0 then
+            table.insert(result, {
+                tool    = tool,
+                name    = tool.Name,
+                rarity  = rarity,
+                rarNum  = rarNum,
+            })
         end
     end
     return result
