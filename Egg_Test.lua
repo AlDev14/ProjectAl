@@ -646,13 +646,12 @@ local function runAutoPlace()
             end
 
             -- 2. AskPlaceEgg
-            local ok3, res = pcall(function()
+            local ok3, res, reason = pcall(function()
                 return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
             end)
-            if ok3 and res then
+            print("[AutoPlace] result:", ok3, tostring(res), tostring(reason), "uid:", uid:sub(1,8))
+            if ok3 and res == true then
                 placed += 1
-            else
-                warn("[AutoPlace] failed uid:", uid:sub(1,8), "res:", tostring(res))
             end
             task.wait(0.1)
         end
