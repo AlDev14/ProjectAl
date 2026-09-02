@@ -570,19 +570,16 @@ local function runAutoPlace()
         local wearRemote  = net and net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not placeRemote then warn("[AutoPlace] AskPlaceEgg not found"); return end
 
-        -- LocalCFrame = posisi PetArea relatif CenterPoint
-        -- Coba beberapa approach biar egg muncul di plot dengan benar
-        local localCFrame
-        pcall(function()
-            -- Approach 1: ToObjectSpace pakai posisi PetArea saja (bukan full CFrame)
-            localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(
-                CFrame.new(myPlot.PetArea.Position)
-            )
-        end)
-        if not localCFrame then
-            -- Fallback dari rspy confirmed
-            localCFrame = CFrame.new(-19.05, -0.50, 37.91, 0,0,1, 0,1,0, -1,0,0)
-        end
+        -- LocalCFrame confirmed dari rspy: rotation 0,0,1,0,1,0,-1,0,0
+        local petPos = myPlot.PetArea.Position
+        local centerCF = myPlot.CenterPoint.CFrame
+        local localPos = centerCF:PointToObjectSpace(petPos)
+        local localCFrame = CFrame.new(localPos) * CFrame.fromMatrix(
+            Vector3.zero,
+            Vector3.new(0,0,-1),  -- RightVector
+            Vector3.new(0,1,0),   -- UpVector
+            Vector3.new(1,0,0)    -- BackVector
+        )
         print("[AutoPlace] localCFrame:", localCFrame)
 
         -- Sync dulu dari server biar ReadOwnerEggs up-to-date
