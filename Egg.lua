@@ -1059,32 +1059,23 @@ for _, sg in ipairs(_pg:GetChildren()) do _beforeShow[sg] = true end
 Window:Show()
 Notify("Steal An Egg", "v2.0 loaded!", 3)
 
+-- _orvionSG: cari langsung by name "OrvionUI" (confirmed dari Orvion source.luau)
+-- Parent = (gethui and gethui()) or CoreGui
 local _orvionSG = nil
+task.spawn(function()
+    local deadline = tick() + 5
+    while not _orvionSG and tick() < deadline do
+        local hub = (type(gethui) == "function" and pcall(gethui) and gethui()) or game:GetService("CoreGui")
+        _orvionSG = hub:FindFirstChild("OrvionUI")
+        if not _orvionSG then task.wait(0.1) end
+    end
+end)
 
 -- ============================================================
 -- FLOATING TOGGLE BUTTON — SETELAH Window:Show()
 -- ============================================================
 task.spawn(function()
-    task.wait(0.3)
-
-    -- Cari _orvionSG di sini (async, setelah Orvion selesai bikin UI)
-    -- Retry sampai ketemu atau timeout 5 detik
-    local deadline = tick() + 5
-    while not _orvionSG and tick() < deadline do
-        for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-            if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
-                _orvionSG = sg; break
-            end
-        end
-        if not _orvionSG then
-            for _, sg in ipairs(_pg:GetChildren()) do
-                if not _beforeShow[sg] and sg:IsA("ScreenGui") and sg.Name ~= "SAE_FloatBtn" then
-                    _orvionSG = sg; break
-                end
-            end
-        end
-        if not _orvionSG then task.wait(0.1) end
-    end
+    task.wait(0.5)
 
     -- Buat button di PlayerGui
     local pg  = LocalPlayer:WaitForChild("PlayerGui")
