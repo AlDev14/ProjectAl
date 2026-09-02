@@ -11,7 +11,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 local Workspace         = game:GetService("Workspace")
 local UserInputService  = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local LocalPlayer       = Players.LocalPlayer
+
+-- ============================================================
+-- INSTANT INTERACT — hook PromptButtonHoldBegan
+-- Set HoldDuration=0 untuk CarryAreaEgg (open source: Lutosys/opensrc)
+-- ============================================================
+ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt, player)
+    if player == LocalPlayer and prompt.Name == "CarryAreaEgg" then
+        prompt.HoldDuration = 0
+    end
+end)
 
 -- ============================================================
 -- MODULE LOADER
@@ -433,18 +444,24 @@ end)
 local function runAutoHatch()
     if not EggState then return end
     pcall(function()
-        local EggWorld = GameRemotes and GameRemotes.EggWorld
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local AskHatch       = net:FindFirstChild("RF/EggWorld/AskHatch")
+        local AskFinishHatch = net:FindFirstChild("RF/EggWorld/AskFinishHatch")
+        if not AskHatch and not AskFinishHatch then return end
+
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
         if not ok or type(owned) ~= "table" then return end
 
         for _, rec in ipairs(owned) do
             if not rec.Uid then continue end
-            if EggWorld and EggWorld.AskHatch then
-                pcall(function() EggWorld.AskHatch:InvokeServer(rec.Uid) end)
+            if AskHatch then
+                pcall(function() AskHatch:InvokeServer(rec.Uid) end)
                 task.wait(0.05)
             end
-            if EggWorld and EggWorld.AskFinishHatch then
-                pcall(function() EggWorld.AskFinishHatch:InvokeServer(rec.Uid) end)
+            if AskFinishHatch then
+                pcall(function() AskFinishHatch:InvokeServer(rec.Uid) end)
                 task.wait(0.02)
             end
         end
@@ -466,25 +483,31 @@ end)
 -- ============================================================
 local function runAutoSell()
     pcall(function()
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+
         if State.sellAll then
-            if GameRemotes and GameRemotes.PetSatchel and GameRemotes.PetSatchel.SellEveryPet then
-                GameRemotes.PetSatchel.SellEveryPet:FireServer()
-                return
-            end
+            local remote = net:FindFirstChild("RE/PetSatchel/SellEveryPet")
+            if remote then pcall(function() remote:FireServer() end) end
+            return
         end
+
+        if not EggState then loadModules() end
         if not EggState then return end
+
+        local remote = net:FindFirstChild("RE/PetSatchel/SellPet")
+        if not remote then return end
+
         local maxNum = getRarityNumberByName(State.sellMaxRarity)
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
         if not ok or type(owned) ~= "table" then return end
+
         for _, rec in ipairs(owned) do
+            if not rec.Uid then continue end
             if getRarityNumber(rec) <= maxNum then
-                if GameRemotes and GameRemotes.PetSatchel and GameRemotes.PetSatchel.SellPet then
-                    pcall(function() GameRemotes.PetSatchel.SellPet:FireServer(rec.Uid) end)
-                else
-                    pcall(function()
-                        if EggState.DropFieldEgg then EggState.DropFieldEgg(rec.Uid) end
-                    end)
-                end
+                pcall(function() remote:FireServer(rec.Uid) end)
+                task.wait(0.05)
             end
         end
     end)
