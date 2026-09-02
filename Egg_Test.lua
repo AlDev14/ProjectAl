@@ -574,16 +574,18 @@ local function runAutoPlace()
             return
         end
 
-        -- Ambil owned records buat cross-reference Uid via AssetCategory
-        local uidMap = {} -- {toolName → uid}
+        -- Ambil owned records — pakai ReadOwnerEggs(UserId) bukan ReadOwnedEgg()
+        local uidMap = {}
         if EggState then
             pcall(function()
-                local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
-                if ok and type(owned) == "table" then
-                    for _, rec in ipairs(owned) do
-                        if rec.Uid and rec.AssetCategory then
-                            uidMap[rec.AssetCategory] = rec.Uid
+                -- ReadOwnerEggs(userId) → {[uid]=record} dict
+                local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
+                if type(owned) == "table" then
+                    for uid, rec in pairs(owned) do
+                        if rec.AssetCategory then
+                            uidMap[rec.AssetCategory] = uid
                         end
+                        uidMap[uid] = uid -- direct uid lookup juga
                     end
                 end
             end)
@@ -696,18 +698,24 @@ end)
 local function runAutoHatch()
     if not EggState then return end
     pcall(function()
-        local EggWorld = GameRemotes and GameRemotes.EggWorld
-        local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
-        if not ok or type(owned) ~= "table" then return end
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local AskHatch       = net:FindFirstChild("RF/EggWorld/AskHatch")
+        local AskFinishHatch = net:FindFirstChild("RF/EggWorld/AskFinishHatch")
+        if not AskHatch and not AskFinishHatch then return end
 
-        for _, rec in ipairs(owned) do
-            if not rec.Uid then continue end
-            if EggWorld and EggWorld.AskHatch then
-                pcall(function() EggWorld.AskHatch:InvokeServer(rec.Uid) end)
+        -- ReadOwnerEggs(userId) → {[uid]=record}
+        local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
+        if type(owned) ~= "table" then return end
+
+        for uid, rec in pairs(owned) do
+            if AskHatch then
+                pcall(function() AskHatch:InvokeServer(uid) end)
                 task.wait(0.05)
             end
-            if EggWorld and EggWorld.AskFinishHatch then
-                pcall(function() EggWorld.AskFinishHatch:InvokeServer(rec.Uid) end)
+            if AskFinishHatch then
+                pcall(function() AskFinishHatch:InvokeServer(uid) end)
                 task.wait(0.02)
             end
         end
