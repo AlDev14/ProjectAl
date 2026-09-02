@@ -790,12 +790,60 @@ local function runAutoPlace()
     end)
 end
 
+-- Count-based trigger: cek jumlah egg di backpack setiap 1 detik
+-- Kalau >= placeThreshold → stop farm → SAFE_POS → plot → place → resume
 task.spawn(function()
     while true do
-        task.wait(State.placeInterval)
-        if State.placeEnabled then
-            if not EggState then loadModules() end
+        task.wait(1)
+        if not State.placeEnabled then continue end
+        if State._placing then continue end
+        if not EggState then loadModules() end
+
+        -- Hitung egg di backpack
+        local eggCount = 0
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                local itype = tool:GetAttribute("ItemType")
+                if (itype == "AssetEgg" or itype == "PetEgg") or AREA_SET[tool.Name] then
+                    eggCount += 1
+                end
+            end
+        end
+
+        if eggCount >= State.placeThreshold then
+            State._placing = true
+            local wasRunning = State.running
+
+            -- Stop farm
+            if wasRunning then
+                State.running = false
+                State.busy = false
+            end
+
+            -- Jalan ke SAFE_POS dulu
+            walkTo(SAFE_POS, 15, false, function() return true end)
+            task.wait(0.3)
+
+            -- Place semua egg
             pcall(runAutoPlace)
+
+            -- Balik ke SAFE_POS
+            walkTo(SAFE_POS, 15, false, function() return true end)
+            task.wait(0.3)
+
+            -- Resume farm
+            if wasRunning then
+                State.running = true
+                task.spawn(function()
+                    while State.running do
+                        farmCycle()
+                        task.wait(0.05)
+                    end
+                end)
+            end
+
+            State._placing = false
+            print(string.format("[AutoPlace] triggered by count=%d, threshold=%d", eggCount, State.placeThreshold))
         end
     end
 end)
