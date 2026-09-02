@@ -412,10 +412,8 @@ local function runAutoPlace()
         local placeRemote = net and net:FindFirstChild("RF/EggWorld/AskPlaceEgg")
         if not placeRemote then return end
 
-        -- LocalCFrame = posisi PetArea relatif ke CenterPoint
-        local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(
-            CFrame.new(myPlot.PetArea.Position)
-        )
+        -- LocalCFrame = CFrame PetArea relatif ke CenterPoint (pakai full CFrame, bukan cuma Position)
+        local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
 
         local ok, owned = pcall(function() return EggState.ReadOwnedEgg() end)
         if not ok or type(owned) ~= "table" or #owned == 0 then return end
@@ -543,8 +541,23 @@ local function runAutoSell()
             if not ok2 then continue end
             task.wait(0.2)
 
-            -- 2. Walk ke sell stand (SellHeldAsset prompt auto-trigger saat dalam 10 stud)
+            -- 2. Walk ke sell stand + trigger SellHeldAsset prompt
             walkTo(sellPos, 10, false)
+            task.wait(0.2)
+            -- Trigger prompt (hold=0, jadi InputHoldBegin langsung selesai)
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") and obj.Name == "SellHeldAsset" then
+                    local part = obj.Parent
+                    if part and part:IsA("BasePart") then
+                        local r = root()
+                        if r and (r.Position - part.Position).Magnitude <= obj.MaxActivationDistance then
+                            pcall(function() obj:InputHoldBegin() end)
+                            task.wait(0.1)
+                            pcall(function() obj:InputHoldEnd() end)
+                        end
+                    end
+                end
+            end
             task.wait(0.3)
         end
     end)
