@@ -572,58 +572,46 @@ local function runAutoPlace()
 
         local localCFrame = myPlot.CenterPoint.CFrame:ToObjectSpace(myPlot.PetArea.CFrame)
 
-        -- Scan backpack + cross-reference dengan EggState buat dapat Uid
-        local eggs = getEggsFromBackpack(State.placeMinRarity == "All" and "" or State.placeMinRarity)
-        if #eggs == 0 then
-            print("[AutoPlace] tidak ada egg di backpack yang lolos filter")
-            return
+        -- Ambil semua owned eggs via ReadOwnerEggs — uid langsung tersedia
+        if not EggState then
+            print("[AutoPlace] EggState nil"); return
         end
 
-        -- Ambil owned records — pakai ReadOwnerEggs(UserId) bukan ReadOwnedEgg()
-        local uidMap = {}
-        if EggState then
-            pcall(function()
-                -- ReadOwnerEggs(userId) → {[uid]=record} dict
-                local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
-                if type(owned) == "table" then
-                    for uid, rec in pairs(owned) do
-                        if rec.AssetCategory then
-                            uidMap[rec.AssetCategory] = uid
-                        end
-                        uidMap[uid] = uid -- direct uid lookup juga
-                    end
-                end
-            end)
+        local ok, owned = pcall(function()
+            return EggState.ReadOwnerEggs(LocalPlayer.UserId)
+        end)
+        if not ok or type(owned) ~= "table" or not next(owned) then
+            print("[AutoPlace] owned egg kosong"); return
         end
 
+        local minRarNum = RARITY_ORDER[State.placeMinRarity] or 0
         local placed = 0
-        for _, egg in ipairs(eggs) do
-            -- Cari uid dulu
-            local uid = uidMap[egg.name]
-                or egg.tool:GetAttribute("Uid")
-                or egg.tool:GetAttribute("uid")
 
-            -- 1. WearEggTool (AskWearTool) — equip via remote dulu
-            if uid and wearRemote then
-                pcall(function() wearRemote:InvokeServer(uid) end)
-                task.wait(0.2)
-            else
-                -- Fallback: pindah tool ke Character langsung
-                pcall(function() egg.tool.Parent = LocalPlayer.Character end)
-                task.wait(0.15)
+        for uid, rec in pairs(owned) do
+            -- Filter rarity
+            if minRarNum > 0 then
+                local rarNum = 0
+                if rec.Rarity and type(rec.Rarity) == "table" then
+                    rarNum = rec.Rarity.RarityNumber or 0
+                end
+                if rarNum < minRarNum then continue end
             end
 
-            -- 2. PlantEgg (AskPlaceEgg)
-            local finalUid = uid or egg.name
+            -- 1. WearEggTool — equip via remote
+            if wearRemote then
+                pcall(function() wearRemote:InvokeServer(uid) end)
+                task.wait(0.25)
+            end
+
+            -- 2. AskPlaceEgg
             local ok3, res = pcall(function()
-                return placeRemote:InvokeServer({Uid = finalUid, LocalCFrame = localCFrame})
+                return placeRemote:InvokeServer({Uid = uid, LocalCFrame = localCFrame})
             end)
             if ok3 and res then
                 placed += 1
-                print("[AutoPlace] placed:", egg.name, "uid:", tostring(finalUid))
+                print("[AutoPlace] placed uid:", uid, "asset:", tostring(rec.AssetCategory))
             else
-                warn("[AutoPlace] failed:", egg.name, tostring(res))
-                pcall(function() egg.tool.Parent = LocalPlayer.Backpack end)
+                warn("[AutoPlace] failed uid:", uid, tostring(res))
             end
             task.wait(0.1)
         end
