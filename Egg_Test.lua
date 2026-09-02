@@ -73,8 +73,10 @@ local State = {
     placeInterval     = 5,
     placeMinRarity    = "All",
     -- Auto Place Pet
-    placePetEnabled   = false,
-    placePetInterval  = 5,
+    placePetEnabled      = false,
+    placePetInterval     = 5,
+    placeBestPetEnabled  = false,
+    placeBestPetInterval = 10,
     -- No Knockback
     noKnockback       = false,
     -- Backpack threshold auto place
@@ -90,11 +92,14 @@ local State = {
     -- Auto Hatch (independent loop)
     hatchEnabled      = false,
     hatchInterval     = 3,
-    -- Auto Sell (independent loop)
+    -- Auto Sell
     sellEnabled       = false,
     sellInterval      = 5,
     sellAll           = false,
     sellMaxRarity     = "Epic",
+    -- Auto Sell Egg
+    sellEggEnabled    = false,
+    sellEggInterval   = 10,
     -- Bat Aura (independent loop)
     batAura           = false,
     batInterval       = 0.1,
@@ -857,6 +862,16 @@ task.spawn(function()
     end
 end)
 
+task.spawn(function()
+    while true do
+        task.wait(State.placeBestPetInterval or 10)
+        if State.placeBestPetEnabled then
+            if not PlotState then loadModules() end
+            pcall(runAutoPlaceBestPet)
+        end
+    end
+end)
+
 -- ============================================================
 -- AUTO HATCH — independent loop
 -- ============================================================
@@ -877,8 +892,7 @@ local function runAutoHatch()
         local hatched = 0
         for uid, rec in pairs(owned) do
             if type(uid) ~= "string" then continue end
-            -- Hanya hatch egg yang sudah di-place (Placement != nil)
-            if rec.Placement == nil then continue end
+            -- Hatch ALL egg (placed maupun belum)
             if AskHatch then
                 pcall(function() AskHatch:InvokeServer(uid) end)
                 task.wait(0.05)
@@ -907,6 +921,119 @@ task.spawn(function()
         end
     end
 end)
+
+-- ============================================================
+-- AUTO SELL EGG — ReadOwnerEggs + SellPet:FireServer({uid})
+-- ============================================================
+local function runAutoSellEgg()
+    if not EggState then loadModules() end
+    if not EggState then return end
+    pcall(function()
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        if not net then return end
+        local sellRemote = net:FindFirstChild("RE/PetSatchel/SellPet")
+        if not sellRemote then warn("[SellEgg] SellPet not found"); return end
+
+        local owned = EggState.ReadOwnerEggs(LocalPlayer.UserId)
+        if type(owned) ~= "table" then return end
+
+        local maxNum = RARITY_ORDER[State.sellMaxRarity] or 0
+        local sold = 0
+
+        for uid, rec in pairs(owned) do
+            if type(uid) ~= "string" then continue end
+            local rarNum = 0
+            if rec.Rarity and type(rec.Rarity) == "table" then
+                rarNum = rec.Rarity.RarityNumber or 0
+            end
+            if rarNum > 0 and rarNum > maxNum then continue end
+            pcall(function() sellRemote:FireServer({uid}) end)
+            sold += 1
+            task.wait(0.05)
+        end
+        if sold > 0 then print("[SellEgg] sold:", sold) end
+    end)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(State.sellEggInterval or 10)
+        if State.sellEggEnabled then
+            if not EggState then loadModules() end
+            pcall(runAutoSellEgg)
+        end
+    end
+end)
+
+-- ============================================================
+-- AUTO PLACE BEST PET — sort by rarity tertinggi dulu
+-- ============================================================
+local function runAutoPlaceBestPet()
+    if not PlotState then loadModules() end
+    if not PlotState then return end
+    pcall(function()
+        local myPlot = PlotState.ResolvePlot()
+        if not myPlot or not myPlot.CenterPoint or not myPlot.PetArea then return end
+
+        local plotPos = myPlot.CenterPoint.Position
+        local r = root()
+        if r and (r.Position - plotPos).Magnitude > 5 then
+            walkTo(plotPos, 15, true, function() return State.placeBestPetEnabled end)
+        end
+        task.wait(0.3)
+
+        local net = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Networking")
+        local placeRemote = net and net:FindFirstChild("RF/EggWorld/AskPlaceEgg")
+        if not placeRemote then return end
+
+        local centerCF = myPlot.CenterPoint.CFrame
+        local basePetPos = myPlot.PetArea.Position
+        local petSize = myPlot.PetArea.Size
+
+        -- Kumpulkan semua pet di backpack + sort by rarity
+        local pets = {}
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if not tool:IsA("Tool") then continue end
+            local itype = tool:GetAttribute("ItemType")
+            if itype ~= "Asset" and itype ~= "Phone" then continue end
+            local rarity = PET_RARITY_MAP[tool.Name]
+            local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
+            table.insert(pets, {tool=tool, name=tool.Name, rarNum=rarNum})
+        end
+
+        -- Sort descending (best first)
+        table.sort(pets, function(a, b) return a.rarNum > b.rarNum end)
+
+        local placed = 0
+        for _, pet in ipairs(pets) do
+            if placed >= 10 then break end
+            -- Random offset
+            local ox = (math.random()*2-1) * petSize.X * 0.4
+            local oz = (math.random()*2-1) * petSize.Z * 0.4
+            local worldPos = basePetPos + Vector3.new(ox, 0, oz)
+            local localPos = centerCF:PointToObjectSpace(worldPos)
+            local localCFrame = CFrame.new(localPos) * CFrame.fromMatrix(
+                Vector3.zero, Vector3.new(0,0,-1), Vector3.new(0,1,0), Vector3.new(1,0,0)
+            )
+
+            pcall(function() pet.tool.Parent = LocalPlayer.Character end)
+            task.wait(0.15)
+
+            local uid = pet.tool:GetAttribute("Uid") or pet.tool:GetAttribute("uid") or pet.name
+            local ok3, res = pcall(function()
+                return placeRemote:InvokeServer({Uid=uid, LocalCFrame=localCFrame})
+            end)
+            if ok3 and res then
+                placed += 1
+                print("[PlaceBestPet] placed:", pet.name, "rarity:", tostring(PET_RARITY_MAP[pet.name]))
+            end
+            task.wait(0.1)
+        end
+        print("[PlaceBestPet] total placed:", placed)
+    end)
+end
 
 -- ============================================================
 -- COLLECT MONEY — RF/AwayEarnings/AskCollect (confirmed rspy)
@@ -1629,6 +1756,19 @@ grpPlacePet:AddButton({ Text = "Place Pet Now", Func = function()
     loadModules(); pcall(runAutoPlacePet); Notify("Place Pet","Triggered!",2)
 end })
 
+local grpPlaceBest = Tabs.Farm:AddRightGroupbox("Auto Place Best Pet")
+grpPlaceBest:AddToggle("PlaceBestPet", {
+    Text = "Enable", Default = false,
+    Callback = function(v) State.placeBestPetEnabled = v; if v then loadModules() end end,
+})
+grpPlaceBest:AddSlider("PlaceBestPetInterval", {
+    Text = "Interval (s)", Default = 10, Min = 5, Max = 60, Rounding = 0,
+    Callback = function(v) State.placeBestPetInterval = v end,
+})
+grpPlaceBest:AddButton({ Text = "Place Best Now", Func = function()
+    loadModules(); pcall(runAutoPlaceBestPet); Notify("Place Best","Triggered!",2)
+end })
+
 local grpHatch = Tabs.Farm:AddRightGroupbox("Auto Hatch")
 
 grpHatch:AddToggle("HatchEgg", {
@@ -1691,6 +1831,19 @@ grpSell:AddButton({ Text = "Sell Now", Func = function()
     loadModules(); pcall(runAutoSell); Notify("Sell","Triggered!",2)
 end })
 
+local grpSellEgg = Tabs.Store:AddLeftGroupbox("Auto Sell Egg")
+grpSellEgg:AddToggle("SellEggEnable", {
+    Text = "Enable", Default = false,
+    Callback = function(v) State.sellEggEnabled = v; if v then loadModules() end end,
+})
+grpSellEgg:AddSlider("SellEggInterval", {
+    Text = "Interval (s)", Default = 10, Min = 5, Max = 60, Rounding = 0,
+    Callback = function(v) State.sellEggInterval = v end,
+})
+grpSellEgg:AddButton({ Text = "Sell Egg Now", Func = function()
+    loadModules(); pcall(runAutoSellEgg); Notify("Sell Egg","Triggered!",2)
+end })
+
 local grpCollect = Tabs.Store:AddRightGroupbox("Collect Money")
 
 grpCollect:AddToggle("CollectEnable", {
@@ -1735,3 +1888,9 @@ SaveManager:BuildConfigSection(Tabs.Config)
 ThemeManager:ApplyToTab(Tabs.Config)
 
 Notify("Steal An Egg", "v2.0 loaded!", 3)
+
+-- Auto-aktif no knockback saat load
+task.spawn(function()
+    task.wait(2)
+    applyNoKnockback()
+end)
