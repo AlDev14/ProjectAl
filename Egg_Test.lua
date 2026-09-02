@@ -105,6 +105,11 @@ local State = {
     batInterval       = 0.1,
     -- ESP
     espEnabled        = false,
+    -- Mutation filter
+    targetMutations   = {}, -- {["Golden"]=true,...} empty=all
+    -- Misc
+    reducedMap        = false,
+    antiAfk           = false,
 }
 
 -- Base teleport koordinat
@@ -302,6 +307,26 @@ end
 -- ============================================================
 -- RARITY FILTER
 -- ============================================================
+-- ============================================================
+-- MUTATIONS (SAE confirmed: Silver 1.25x, Bloom 1.5x, Golden 2x, Rainbow 2.5x, Spirit Bloom 3x)
+-- ============================================================
+local MUTATIONS = {"Silver", "Bloom", "Golden", "Rainbow", "Spirit Bloom"}
+
+local function isMutationAllowed(record)
+    if not next(State.targetMutations) then return true end
+    -- record.Mutations = {table} — cek apakah ada mutasi yang match
+    if not record or not record.Mutations then return false end
+    if type(record.Mutations) ~= "table" then return false end
+    for mutName, _ in pairs(State.targetMutations) do
+        -- Cek di mutations table
+        for k, v in pairs(record.Mutations) do
+            local name = type(k) == "string" and k or tostring(v)
+            if name:lower():find(mutName:lower()) then return true end
+        end
+    end
+    return false
+end
+
 local function isRarityAllowed(record)
     local t = State.targetRarities
     if not t then return true end
@@ -612,6 +637,7 @@ local function findBestEgg()
     for _, rec in ipairs(fieldEggs.Records) do
         if not isRarityAllowed(rec) then continue end
         if not isValueAllowed(rec)  then continue end
+        if not isMutationAllowed(rec) then continue end
 
         local model = Workspace:FindFirstChild("AreaEggSlotsClient", true)
             and Workspace.AreaEggSlotsClient:FindFirstChild(rec.Uid)
@@ -1347,6 +1373,94 @@ task.spawn(function()
 end)
 
 -- ============================================================
+-- MISC FEATURES
+-- ============================================================
+local _antiAfkConn = nil
+local function setReduceMap(enabled)
+    pcall(function()
+        local ws = game:GetService("Workspace")
+        if enabled then
+            ws.StreamingEnabled = false
+            for _, obj in ipairs(ws:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("BasePart") and not obj:IsDescendantOf(LocalPlayer.Character or game) then
+                        obj.LocalTransparencyModifier = 1
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+local function setAntiAfk(enabled)
+    if _antiAfkConn then _antiAfkConn:Disconnect(); _antiAfkConn = nil end
+    if not enabled then return end
+    _antiAfkConn = RunService.Heartbeat:Connect(function()
+        -- Reset idle timer
+        pcall(function()
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendKeyEvent(true, Enum.KeyCode.F24, false, game)
+            vim:SendKeyEvent(false, Enum.KeyCode.F24, false, game)
+        end)
+    end)
+end
+
+-- FPS + Ping Counter (ScreenGui)
+local _statsGui = nil
+local function updateStatsGui(show)
+    if not show then
+        if _statsGui then _statsGui:Destroy(); _statsGui = nil end
+        return
+    end
+    if _statsGui then return end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "SAE_Stats"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.DisplayOrder = 99998
+    sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.fromOffset(120, 36)
+    frame.Position = UDim2.new(1, -130, 0, 8)
+    frame.BackgroundColor3 = Color3.fromRGB(15,15,20)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = sg
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0,6)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,0,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = Color3.fromRGB(220,220,230)
+    lbl.TextSize = 11
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = "FPS: -- | Ping: --"
+    lbl.Parent = frame
+
+    _statsGui = sg
+
+    -- Update loop
+    local lastTime = tick()
+    local frameCount = 0
+    RunService.RenderStepped:Connect(function()
+        if not _statsGui or not _statsGui.Parent then return end
+        frameCount += 1
+        local now = tick()
+        if now - lastTime >= 1 then
+            local fps = math.floor(frameCount / (now - lastTime))
+            frameCount = 0
+            lastTime = now
+            local ping = 0
+            pcall(function()
+                ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            end)
+            lbl.Text = string.format("FPS: %d | Ping: %dms", fps, ping)
+        end
+    end)
+end
+
+-- ============================================================
 -- FARM CYCLE
 -- ============================================================
 local function farmCycle()
@@ -1627,6 +1741,7 @@ local Window = Library:CreateWindow({
 local Tabs = {
     Farm   = Window:AddTab("Farm",   "wheat"),
     Store  = Window:AddTab("Store",  "shopping-bag"),
+    Misc   = Window:AddTab("Misc",   "settings-2"),
     Config = Window:AddTab("Config", "settings"),
 }
 
@@ -1702,6 +1817,20 @@ grpSteal:AddDropdown("FarmRarities", {
         State.targetRarities = {}
         for k, sel in pairs(v) do
             if sel then State.targetRarities[k] = true end
+        end
+    end,
+})
+
+grpSteal:AddDropdown("FarmMutations", {
+    Values   = MUTATIONS,
+    Default  = 1,
+    Multi    = true,
+    Text     = "Target Mutations",
+    Tooltip  = "Kosong = semua (termasuk no mutation)",
+    Callback = function(v)
+        State.targetMutations = {}
+        for k, sel in pairs(v) do
+            if sel then State.targetMutations[k] = true end
         end
     end,
 })
@@ -1914,6 +2043,84 @@ grpFav:AddButton({ Text = "Favorite Now", Func = function()
 end })
 
 -- ── CONFIG ─────────────────────────────────────────────────────
+-- ── MISC TAB ─────────────────────────────────────────────────
+local grpMisc = Tabs.Misc:AddLeftGroupbox("Visual")
+
+grpMisc:AddToggle("ShowStats", {
+    Text = "FPS & Ping Counter", Default = false,
+    Callback = function(v) updateStatsGui(v) end,
+})
+
+grpMisc:AddToggle("ReduceMap", {
+    Text    = "Reduce Map",
+    Default = false,
+    Tooltip = "Hide non-essential parts untuk FPS",
+    Callback = function(v) State.reducedMap = v; setReduceMap(v) end,
+})
+
+local grpMisc2 = Tabs.Misc:AddRightGroupbox("Utility")
+
+grpMisc2:AddToggle("AntiAfk", {
+    Text    = "Anti AFK",
+    Default = false,
+    Tooltip = "Prevent automatic kick",
+    Callback = function(v) State.antiAfk = v; setAntiAfk(v) end,
+})
+
+grpMisc2:AddToggle("AntiStaff", {
+    Text    = "Anti Staff",
+    Default = false,
+    Tooltip = "Stop farm kalau ada staff di server",
+    Callback = function(v)
+        if v then
+            -- Monitor staff presence
+            task.spawn(function()
+                while v and Toggles and Toggles.AntiStaff and Toggles.AntiStaff.Value do
+                    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+                        if p ~= LocalPlayer then
+                            local badge = p:GetAttribute("IsStaff") or p:GetAttribute("Staff")
+                            if badge then
+                                State.running = false
+                                Notify("Anti Staff", "Staff detected: "..p.Name, 5)
+                                break
+                            end
+                        end
+                    end
+                    task.wait(3)
+                end
+            end)
+        end
+    end,
+})
+
+grpMisc2:AddButton({ Text = "Rejoin", Func = function()
+    local TeleportService = game:GetService("TeleportService")
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end)
+end })
+
+grpMisc2:AddButton({ Text = "Server Hop", Func = function()
+    pcall(function()
+        local HS = game:GetService("HttpService")
+        local TPS = game:GetService("TeleportService")
+        local result = HS:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+        ))
+        local servers = {}
+        for _, s in ipairs(result.data or {}) do
+            if s.id ~= game.JobId and s.playing < s.maxPlayers then
+                table.insert(servers, s)
+            end
+        end
+        if #servers > 0 then
+            TPS:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1,#servers)].id, LocalPlayer)
+        else
+            Notify("Server Hop", "No servers found", 3)
+        end
+    end)
+end })
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:SetFolder("SAE_Test")
