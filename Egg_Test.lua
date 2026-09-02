@@ -75,6 +75,7 @@ local State = {
     -- Auto Place Pet
     placePetEnabled      = false,
     placePetInterval     = 5,
+    placePetThreshold    = 10,
     placeBestPetEnabled  = false,
     placeBestPetInterval = 10,
     -- No Knockback
@@ -923,16 +924,44 @@ local function runAutoPlacePet()
     end)
 end
 
+-- Count-based trigger: cek jumlah pet di backpack tiap 1 detik
 task.spawn(function()
     while true do
-        task.wait(State.placePetInterval or 5)
-        if State.placePetEnabled then
-            if not PlotState then loadModules() end
+        task.wait(1)
+        if not State.placePetEnabled then continue end
+        if State._placing then continue end
+
+        local petCount = 0
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                local itype = tool:GetAttribute("ItemType")
+                if itype == "Asset" or itype == "Phone" then
+                    petCount += 1
+                end
+            end
+        end
+
+        if petCount >= (State.placePetThreshold or 10) then
+            State._placing = true
+            local wasRunning = State.running
+            if wasRunning then State.running = false; State.busy = false end
+            walkTo(SAFE_POS, 15, false, function() return true end)
+            task.wait(0.3)
             pcall(runAutoPlacePet)
+            walkTo(SAFE_POS, 15, false, function() return true end)
+            task.wait(0.3)
+            if wasRunning then
+                State.running = true
+                task.spawn(function()
+                    while State.running do farmCycle(); task.wait(0.05) end
+                end)
+            end
+            State._placing = false
         end
     end
 end)
 
+-- Best pet: timer-based saja (jarang perlu, biar gak gangguin farm)
 task.spawn(function()
     while true do
         task.wait(State.placeBestPetInterval or 10)
@@ -1378,16 +1407,28 @@ end)
 local _antiAfkConn = nil
 local function setReduceMap(enabled)
     pcall(function()
-        local ws = game:GetService("Workspace")
+        local lighting = game:GetService("Lighting")
         if enabled then
-            ws.StreamingEnabled = false
-            for _, obj in ipairs(ws:GetDescendants()) do
+            -- Hanya kurangi efek visual, TIDAK hide object
+            lighting.GlobalShadows = false
+            lighting.FogEnd = 9999
+            lighting.FogStart = 9998
+            -- Matikan particle effects
+            for _, obj in ipairs(game:GetService("Workspace"):GetDescendants()) do
                 pcall(function()
-                    if obj:IsA("BasePart") and not obj:IsDescendantOf(LocalPlayer.Character or game) then
-                        obj.LocalTransparencyModifier = 1
+                    if obj:IsA("ParticleEmitter") or obj:IsA("Trail")
+                    or obj:IsA("Beam") or obj:IsA("SelectionBox") then
+                        obj.Enabled = false
+                    end
+                    if obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+                        obj.Enabled = false
                     end
                 end)
             end
+        else
+            lighting.GlobalShadows = true
+            lighting.FogEnd = 100000
+            lighting.FogStart = 0
         end
     end)
 end
@@ -1910,9 +1951,10 @@ grpPlacePet:AddToggle("PlacePet", {
     Default = false,
     Callback = function(v) State.placePetEnabled = v; if v then loadModules() end end,
 })
-grpPlacePet:AddSlider("PlacePetInterval", {
-    Text = "Interval (s)", Default = 5, Min = 1, Max = 30, Rounding = 0,
-    Callback = function(v) State.placePetInterval = v end,
+grpPlacePet:AddSlider("PlacePetThreshold", {
+    Text = "Trigger Count", Default = 10, Min = 1, Max = 100, Rounding = 0,
+    Tooltip = "Auto place kalau pet di backpack >= ini",
+    Callback = function(v) State.placePetThreshold = v end,
 })
 grpPlacePet:AddButton({ Text = "Place Pet Now", Func = function()
     loadModules(); pcall(runAutoPlacePet); Notify("Place Pet","Triggered!",2)
@@ -1956,17 +1998,16 @@ grpVal:AddInput("MinEarning", {
     Text = "Min Earning Rate", Placeholder = "0 = off",
     Callback = function(v) State.minEarningRate = tonumber(v) or 0 end,
 })
-grpVal:AddInput("MinWeight", {
-    Default = "0", Numeric = true, Finished = true,
-    Text = "Min Weight", Placeholder = "0 = off",
-    Callback = function(v) State.minModelWeight = tonumber(v) or 0 end,
+grpVal:AddSlider("MinWeight", {
+    Text = "Min Weight (kg)", Default = 0, Min = 0, Max = 10000, Rounding = 0,
+    Tooltip = "Skip egg di bawah weight ini (0 = off)",
+    Callback = function(v) State.minModelWeight = v end,
 })
-grpVal:AddInput("MaxWeight", {
-    Default = "0", Numeric = true, Finished = true,
-    Text = "Max Weight", Placeholder = "0 = off",
+grpVal:AddSlider("MaxWeight", {
+    Text = "Max Weight (kg)", Default = 0, Min = 0, Max = 100000, Rounding = 0,
+    Tooltip = "Skip egg di atas weight ini (0 = off)",
     Callback = function(v)
-        local n = tonumber(v) or 0
-        State.maxModelWeight = n == 0 and 999999999 or n
+        State.maxModelWeight = v == 0 and 999999999 or v
     end,
 })
 
