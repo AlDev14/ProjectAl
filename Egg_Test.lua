@@ -63,6 +63,11 @@ local State = {
     minEarningRate    = 0,
     minModelWeight    = 0,
     maxModelWeight    = 999999999,
+    -- Float
+    floatEnabled      = false,
+    floatHeight       = 3,
+    -- Animation
+    animEnabled       = true,
     -- Auto Place (independent loop)
     placeEnabled      = false,
     placeInterval     = 5,
@@ -266,7 +271,74 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================
--- WALK TO
+-- FLOAT SYSTEM
+-- ============================================================
+local _floatConn = nil
+local function updateFloat()
+    if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
+    if not State.floatEnabled then return end
+    _floatConn = RunService.Heartbeat:Connect(function()
+        if not State.floatEnabled then return end
+        local c = LocalPlayer.Character
+        if not c then return end
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        -- Raycast ke bawah cari ground
+        local origin    = hrp.Position
+        local direction = Vector3.new(0, -50, 0)
+        local params    = RaycastParams.new()
+        params.FilterDescendantsInstances = {c}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        local result = Workspace:Raycast(origin, direction, params)
+        local groundY = result and result.Position.Y or (origin.Y - 3)
+        local targetY = groundY + State.floatHeight
+        -- Lock Y, cancel vertical velocity
+        if math.abs(hrp.Position.Y - targetY) > 0.1 then
+            hrp.CFrame = CFrame.new(hrp.Position.X, targetY, hrp.Position.Z)
+                * CFrame.fromMatrix(Vector3.zero, hrp.CFrame.RightVector, Vector3.new(0,1,0))
+        end
+        local vel = hrp.AssemblyLinearVelocity
+        hrp.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z)
+    end)
+end
+
+-- ============================================================
+-- ANIMATION TOGGLE
+-- ============================================================
+local _animTracks = {}
+local function stopAllAnims()
+    local c = LocalPlayer.Character
+    if not c then return end
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+        track:Stop(0)
+        table.insert(_animTracks, track)
+    end
+    -- Animator juga
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop(0)
+            table.insert(_animTracks, track)
+        end
+    end
+end
+
+local function resumeAllAnims()
+    for _, track in ipairs(_animTracks) do
+        pcall(function() track:Play() end)
+    end
+    _animTracks = {}
+end
+
+local function updateAnim()
+    if State.animEnabled then
+        resumeAllAnims()
+    else
+        stopAllAnims()
+    end
+end
 -- ============================================================
 local function walkTo(goal, timeout, isReturning)
     local h2 = hum()
@@ -903,6 +975,36 @@ secMain:AddToggle({
     Default  = false,
     Flag     = "Toggle_BatAura",
     Callback = function(v) State.batAura = v end,
+})
+
+secMain:AddToggle({
+    Text     = "Float (3 stud)",
+    Default  = false,
+    Flag     = "Toggle_Float",
+    Callback = function(v)
+        State.floatEnabled = v
+        updateFloat()
+    end,
+})
+
+secMain:AddSlider({
+    Text      = "Float Height",
+    Min       = 1,
+    Max       = 10,
+    Default   = 3,
+    Increment = 1,
+    Flag      = "Slider_FloatHeight",
+    Callback  = function(v) State.floatHeight = v end,
+})
+
+secMain:AddToggle({
+    Text     = "Animation",
+    Default  = true,
+    Flag     = "Toggle_Anim",
+    Callback = function(v)
+        State.animEnabled = v
+        updateAnim()
+    end,
 })
 
 secMain:AddSlider({
