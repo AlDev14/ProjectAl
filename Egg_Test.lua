@@ -1517,6 +1517,7 @@ local function runAutoSellPet()
         end
 
         local sellRemote = net:FindFirstChild("RE/PetSatchel/SellPet")
+        local wearRemote = net:FindFirstChild("RF/EggWorld/AskWearTool")
         if not sellRemote then warn("[SellPet] SellPet remote not found"); return end
 
         local maxNum = RARITY_ORDER[State.sellMaxRarity] or 0
@@ -1525,41 +1526,28 @@ local function runAutoSellPet()
         for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
             if not tool:IsA("Tool") then continue end
             local itype = tool:GetAttribute("ItemType")
-            -- Pet = ItemType Asset atau Phone
             if itype ~= "Asset" and itype ~= "Phone" then continue end
 
-            -- Cek rarity dari PET_RARITY_MAP
             local rarity = PET_RARITY_MAP[tool.Name]
             local rarNum = rarity and (RARITY_ORDER[rarity] or 0) or 0
-
-            -- Unknown rarity = skip (jangan jual yang gak kenal)
             if rarNum == 0 then unknown += 1; continue end
-
-            -- Skip kalau rarity di atas max
             if rarNum > maxNum then skipped += 1; continue end
 
-            -- Skip kalau favorited
             local isFav = tool:GetAttribute("IsFavorited") or tool:GetAttribute("Favorited")
             if isFav then skipped += 1; continue end
 
-            -- Sell via SellPet
             local uid = tool:GetAttribute("Uid") or tool:GetAttribute("uid")
-            if uid then
-                pcall(function() sellRemote:FireServer({uid}) end)
-            else
-                -- Fallback: pindah ke Character dulu buat dapat tool instance
-                pcall(function() tool.Parent = LocalPlayer.Character end)
-                task.wait(0.1)
-                -- Coba ToolTrigger
-                local trigRemote = net:FindFirstChild("RE/ToolTrigger/Trigger")
-                if trigRemote then
-                    local char = LocalPlayer.Character
-                    local t = char and char:FindFirstChildOfClass("Tool")
-                    if t then pcall(function() trigRemote:FireServer(t) end) end
-                end
+            if not uid then skipped += 1; continue end
+
+            -- Equip dulu via AskWearTool
+            if wearRemote then
+                pcall(function() wearRemote:InvokeServer(uid) end)
+                task.wait(0.2)
             end
+
+            pcall(function() sellRemote:FireServer({uid}) end)
             sold += 1
-            task.wait(0.05)
+            task.wait(0.1)
         end
 
         print(string.format("[SellPet] sold=%d skipped=%d unknown=%d", sold, skipped, unknown))
