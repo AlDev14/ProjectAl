@@ -291,10 +291,9 @@ local function isValueAllowed(record)
 end
 
 -- ============================================================
--- HUMANOID BYPASS — clone/destroy + AutoJump = true
+-- HUMANOID BYPASS
 -- ============================================================
-local _speedConn = nil
-local _camConn   = nil
+local _camConn = nil
 
 local function doHumanoidBypass()
     local char = LocalPlayer.Character
@@ -306,13 +305,12 @@ local function doHumanoidBypass()
 
     pcall(function()
         local clone = origHum:Clone()
-        clone.WalkSpeed   = State.speed
+        clone.WalkSpeed   = origHum.WalkSpeed
         clone.JumpPower   = origHum.JumpPower
         clone.MaxHealth   = origHum.MaxHealth
         clone.Health      = origHum.Health
         clone.AutoRotate  = origHum.AutoRotate
         clone.DisplayName = origHum.DisplayName
-        clone.AutoJump    = true  -- jump normal Roblox (Space/button)
         clone.Parent      = char
         task.wait(0.05)
         origHum:Destroy()
@@ -330,7 +328,7 @@ local function doHumanoidBypass()
         pcall(function() clone:ChangeState(Enum.HumanoidStateType.Running) end)
     end)
 
-    -- Camera lock
+    -- Camera lock via Heartbeat
     if _camConn then _camConn:Disconnect() end
     _camConn = RunService.Heartbeat:Connect(function()
         local c = LocalPlayer.Character
